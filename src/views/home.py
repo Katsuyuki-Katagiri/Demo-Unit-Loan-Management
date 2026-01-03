@@ -32,13 +32,39 @@ def render_home_view():
     # --- Level 3: Unit Detail (Checklist) ---
     if st.session_state.get('selected_unit_id'):
         unit_id = st.session_state['selected_unit_id']
+        
+        # Check if in Loan Mode
+        if st.session_state.get('loan_mode'):
+            from src.views.loan import render_loan_view
+            render_loan_view(unit_id)
+            return
+
         unit = get_device_unit_by_id(unit_id)
         type_info = get_device_type_by_id(unit['device_type_id'])
         
-        st.title(f"{type_info['name']} (Lot: {unit['lot_number']})")
-        st.info(f"保管場所: {unit['location']} | Status: {unit['status']}")
-        
-        st.subheader("構成品チェックリスト")
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            st.title(f"{type_info['name']} (Lot: {unit['lot_number']})")
+            st.info(f"保管場所: {unit['location']} | Status: {unit['status']}")
+        with c2:
+            st.write("") # spacer
+            st.write("")
+            # Check conditions for Loan
+            from src.database import get_open_issues
+            issues = get_open_issues(unit_id)
+            
+            can_loan = (unit['status'] == 'in_stock') and (not issues)
+            
+            if can_loan:
+                if st.button("📦 貸出登録 (Checkout)", type="primary"):
+                    st.session_state['loan_mode'] = True
+                    st.rerun()
+            elif unit['status'] != 'in_stock':
+                st.button(f"貸出不可 ({unit['status']})", disabled=True)
+            elif issues:
+                st.button("貸出不可 (要対応あり)", disabled=True)
+
+        st.subheader("構成品チェックリスト (参照)")
         checklist = get_synthesized_checklist(unit['device_type_id'], unit['id'])
         
         if not checklist:
@@ -49,8 +75,6 @@ def render_home_view():
                    c1, c2 = st.columns([1, 4])
                    with c1:
                        if item['photo_path']:
-                           # TODO: logic.py needs to fetch photo_path for overrides too if possible.
-                           # Currently basic items have it.
                            full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
                            if os.path.exists(full_path):
                                st.image(full_path, use_container_width=True)

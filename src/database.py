@@ -94,6 +94,74 @@ def init_db():
         )
     ''')
     
+    
+
+    # Phase 2 Tables
+    # Loans (貸出)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS loans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_unit_id INTEGER NOT NULL,
+            checkout_date TEXT NOT NULL,
+            destination TEXT NOT NULL,
+            purpose TEXT NOT NULL,
+            checker_user_id INTEGER, -- Optional: ID of user who performed checkout
+            status TEXT DEFAULT 'open', -- open, closed
+            canceled INTEGER DEFAULT 0, -- 0: false, 1: true
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (device_unit_id) REFERENCES device_units (id)
+        )
+    ''')
+
+    # Check Sessions (チェック単位)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS check_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_type TEXT NOT NULL, -- 'checkout', 'return'
+            loan_id INTEGER,
+            device_unit_id INTEGER NOT NULL,
+            performed_by TEXT, -- User name or ID
+            performed_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            device_photo_dir TEXT, -- Path to directory containing session photos
+            canceled INTEGER DEFAULT 0,
+            FOREIGN KEY (loan_id) REFERENCES loans (id),
+            FOREIGN KEY (device_unit_id) REFERENCES device_units (id)
+        )
+    ''')
+
+    # Check Lines (構成品ごとの結果)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS check_lines (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            check_session_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            required_qty INTEGER NOT NULL,
+            result TEXT NOT NULL, -- 'OK', 'NG'
+            ng_reason TEXT, -- 'lost', 'damaged', 'missing_qty'
+            found_qty INTEGER, -- If missing_qty, how many found?
+            comment TEXT,
+            FOREIGN KEY (check_session_id) REFERENCES check_sessions (id),
+            FOREIGN KEY (item_id) REFERENCES items (id)
+        )
+    ''')
+
+    # Issues (要対応)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS issues (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            device_unit_id INTEGER NOT NULL,
+            check_session_id INTEGER,
+            status TEXT DEFAULT 'open', -- open, closed
+            summary TEXT, -- e.g. "Missing power cord"
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_by TEXT,
+            resolved_at TEXT,
+            resolved_by TEXT,
+            FOREIGN KEY (device_unit_id) REFERENCES device_units (id),
+            FOREIGN KEY (check_session_id) REFERENCES check_sessions (id)
+        )
+    ''')
+    
     conn.commit()
     conn.close()
 
@@ -272,6 +340,13 @@ def get_device_unit_by_id(unit_id: int):
     conn.close()
     return res
 
+def update_unit_status(unit_id: int, status: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE device_units SET status = ? WHERE id = ?", (status, unit_id))
+    conn.commit()
+    conn.close()
+
 # -- Unit Overrides --
 def add_unit_override(device_unit_id: int, item_id: int, action: str, qty: int = 0):
     conn = sqlite3.connect(DB_PATH)
@@ -291,7 +366,7 @@ def get_unit_overrides(device_unit_id: int):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""
-        SELECT uo.*, i.name as item_name
+        SELECT uo.*, i.name as item_name, i.photo_path
         FROM unit_overrides uo
         JOIN items i ON uo.item_id = i.id
         WHERE uo.device_unit_id = ?
@@ -299,3 +374,80 @@ def get_unit_overrides(device_unit_id: int):
     res = c.fetchall()
     conn.close()
     return res
+
+# -- Issues --
+def get_open_issues(device_unit_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM issues WHERE device_unit_id = ? AND status = 'open'", (device_unit_id,))
+    res = c.fetchall()
+    conn.close()
+    return res
+
+def create_issue(device_unit_id: int, check_session_id: int, summary: str, created_by: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO issues (device_unit_id, check_session_id, status, summary, created_by)
+        VALUES (?, ?, 'open', ?, ?)
+    """, (device_unit_id, check_session_id, summary, created_by))
+    conn.commit()
+    conn.close()
+
+# -- Phase 2 Operations --
+
+def create_loan(
+    device_unit_id: int, 
+    checkout_date: str, 
+    destination: str, 
+    purpose: str, 
+    checker_user_id: Optional[int] = None
+) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO loans (device_unit_id, checkout_date, destination, purpose, checker_user_id, status)
+        VALUES (?, ?, ?, ?, ?, 'open')
+    """, (device_unit_id, checkout_date, destination, purpose, checker_user_id))
+    loan_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return loan_id
+
+def create_check_session(
+    session_type: str,
+    device_unit_id: int,
+    loan_id: Optional[int],
+    performed_by: str,
+    device_photo_dir: str
+) -> int:
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO check_sessions (session_type, device_unit_id, loan_id, performed_by, device_photo_dir)
+        VALUES (?, ?, ?, ?, ?)
+    """, (session_type, device_unit_id, loan_id, performed_by, device_photo_dir))
+    session_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return session_id
+
+def create_check_line(
+    check_session_id: int,
+    item_id: int,
+    required_qty: int,
+    result: str, # OK/NG
+    ng_reason: str = None,
+    found_qty: int = None,
+    comment: str = None
+):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO check_lines (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment))
+    conn.commit()
+    conn.close()
+

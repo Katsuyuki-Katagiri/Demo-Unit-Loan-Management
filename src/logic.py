@@ -46,19 +46,10 @@ def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
         
         elif action == 'add':
             # Add new item
-            # We need photo_path, which might not be in override query if we didn't join properly?
-            # get_unit_overrides joins items, so we have item_name. 
-            # Wait, did I select photo_path in get_unit_overrides?
-            # Let's check database.py... 
-            # I did `SELECT uo.*, i.name as item_name FROM ...`. I missed photo_path!
-            # I should fix database.py OR just fetch item details here.
-            # For efficiency let's assume we might lack photo_path for added items unless I fix the query.
-            # But for now, let's just proceed. The item_name is there.
-            
             checklist_map[item_id] = {
                 'item_id': item_id,
                 'name': ov['item_name'],
-                'photo_path': None, # Fix later if needed
+                'photo_path': ov['photo_path'],
                 'required_qty': qty,
                 'sort_order': 999, # Put at end
                 'is_override': True
@@ -69,3 +60,92 @@ def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     final_list.sort(key=lambda x: x['sort_order'])
     
     return final_list
+
+# --- Phase 2: Loan Logic ---
+
+from src.database import (
+    create_loan, create_check_session, create_check_line, 
+    create_issue, update_unit_status, get_open_issues,
+    get_device_unit_by_id
+)
+import datetime
+
+def process_loan(
+    device_unit_id: int,
+    checkout_date: str,
+    destination: str,
+    purpose: str,
+    check_results: list, # List of dict: {item_id, result, ng_reason, found_qty, comment}
+    photo_dir: str,
+    user_id: int = None,
+    user_name: str = "Unknown"
+):
+    """
+    Process a loan request.
+    1. Validation: Unit IN_STOCK? No Open Issues?
+    2. Create Loan
+    3. Create Check Session
+    4. Create Check Lines -> If NG, flag issues
+    5. Update Unit Status (Loaned or Needs Attention)
+    """
+    
+    # 1. Validation
+    # get_device_unit_by_id returns the row, so we can check status
+    unit = get_device_unit_by_id(device_unit_id)
+    
+    if unit['status'] != 'in_stock':
+        raise ValueError(f"Unit is not in stock (current: {unit['status']})")
+        
+    issues = get_open_issues(device_unit_id)
+    if issues:
+        raise ValueError("Unit has open issues and cannot be loaned.")
+
+    # 2. Create Loan
+    loan_id = create_loan(
+        device_unit_id=device_unit_id,
+        checkout_date=checkout_date,
+        destination=destination,
+        purpose=purpose,
+        checker_user_id=user_id
+    )
+    
+    # 3. Create Check Session
+    session_id = create_check_session(
+        session_type='checkout',
+        device_unit_id=device_unit_id,
+        loan_id=loan_id,
+        performed_by=user_name,
+        device_photo_dir=photo_dir
+    )
+    
+    # 4. Process Check Lines & Check for NG
+    has_ng = False
+    
+    for res in check_results:
+        # result: 'OK' or 'NG'
+        is_ng = (res['result'] == 'NG')
+        if is_ng:
+            has_ng = True
+            
+        create_check_line(
+            check_session_id=session_id,
+            item_id=res['item_id'],
+            required_qty=res['required_qty'],
+            result=res['result'],
+            ng_reason=res.get('ng_reason'),
+            found_qty=res.get('found_qty'),
+            comment=res.get('comment')
+        )
+        
+        if is_ng:
+            # Create Issue
+            summary = f"NG Item: {res['name']} - {res.get('ng_reason')}"
+            create_issue(device_unit_id, session_id, summary, user_name)
+            
+    # 5. Update Status
+    if has_ng:
+        update_unit_status(device_unit_id, 'needs_attention')
+        return "needs_attention"
+    else:
+        update_unit_status(device_unit_id, 'loaned')
+        return "loaned"
