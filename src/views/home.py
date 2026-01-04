@@ -140,8 +140,21 @@ def render_home_view():
             st.write("") # spacer
             st.write("")
             # Check conditions for Loan/Return
-
-            # issues fetched above
+            
+            # Custom CSS for tall buttons (Primary Only)
+            # Streamlit buttons with type="primary" have kind="primary" attribute in newer versions or specific classes.
+            # Using partial selector for data-testid or kind might be safer.
+            # However, looking at DOM, usually `button[kind="primary"]` works for st.button(type="primary").
+            st.markdown("""
+                <style>
+                div.stButton > button[kind="primary"] {
+                    height: 100px;
+                    font-size: 1.5em;
+                    font-weight: bold;
+                }
+                /* Fallback for older streamlit versions if 'kind' attr isn't present, though less likely to be needed based on context */
+                </style>
+            """, unsafe_allow_html=True)
             active_loan = get_active_loan(unit_id)
             
             # Re-check issues (might be resolved just now)
@@ -151,13 +164,15 @@ def render_home_view():
             can_return = (unit['status'] == 'loaned') or (active_loan)
             
             if can_loan:
-                if st.button("📦 貸出登録 (Checkout)", type="primary"):
+                if st.button("📦 貸出登録 (Checkout)", type="primary", use_container_width=True):
                     st.session_state['loan_mode'] = True
                     st.rerun()
+                st.markdown("<div style='text-align: center; color: gray; font-size: 0.8em; margin-top: -10px; margin-bottom: 20px;'>貸出登録は、上記ボタンから行ってください</div>", unsafe_allow_html=True)
             elif can_return:
-                 if st.button("↩️ 返却登録 (Return)", type="primary"):
+                 if st.button("↩️ 返却登録 (Return)", type="primary", use_container_width=True):
                     st.session_state['return_mode'] = True
                     st.rerun()
+                 st.markdown("<div style='text-align: center; color: gray; font-size: 0.8em; margin-top: -10px; margin-bottom: 20px;'>返却登録は、上記ボタンから行ってください</div>", unsafe_allow_html=True)
             elif unit['status'] != 'in_stock' and not active_loan:
                  st.button(f"状態: {unit['status']}", disabled=True)
             elif issues:
