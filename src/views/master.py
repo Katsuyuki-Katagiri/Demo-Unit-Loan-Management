@@ -83,9 +83,9 @@ def render_master_view():
                         unit = units[0] 
                         
                         # Display current info
-                        st.success(f"登録済み: Lot {unit['lot_number']} (ID: {unit['id']})")
+                        st.success(f"登録済み: Lot {unit['lot_number']}")
                         st.dataframe(
-                            [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location'], "Mfg Date": u['mfg_date']} for u in units],
+                            [{"ロット": u['lot_number'], "保管場所": u['location'], "製造年月日": u['mfg_date']} for u in units],
                             use_container_width=True
                         )
 
