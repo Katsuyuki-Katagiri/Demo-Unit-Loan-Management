@@ -458,6 +458,19 @@ def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: s
     finally:
         conn.close()
 
+def update_device_type_name(type_id: int, new_name: str) -> bool:
+    """Update the name of a device type."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE device_types SET name = ? WHERE id = ?", (new_name, type_id))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
 def delete_device_unit(unit_id: int):
     """Delete a unit and all its related history (Cascade)."""
     conn = sqlite3.connect(DB_PATH)
@@ -493,6 +506,32 @@ def delete_device_unit(unit_id: int):
     except Exception as e:
         print(e)
         return False
+    finally:
+        conn.close()
+
+def delete_device_type(type_id: int):
+    """Delete a device type and ALL related data (Cascade)."""
+    # 1. Get all units
+    units = get_device_units(type_id)
+    
+    # 2. Delete each unit (using existing logic)
+    for u in units:
+        if not delete_device_unit(u['id']):
+            return False, f"Unit ID {u['id']} delete failed"
+
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # 3. Delete Template Lines
+        c.execute("DELETE FROM template_lines WHERE device_type_id = ?", (type_id,))
+        
+        # 4. Delete Device Type
+        c.execute("DELETE FROM device_types WHERE id = ?", (type_id,))
+        
+        conn.commit()
+        return True, "機種を削除しました"
+    except Exception as e:
+        return False, str(e)
     finally:
         conn.close()
 

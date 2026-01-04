@@ -7,7 +7,8 @@ from src.database import (
     create_item, get_all_items, add_template_line, get_template_lines,
     create_device_unit, get_device_units, add_unit_override, 
     get_unit_overrides, update_device_unit, UPLOAD_DIR,
-    update_item, delete_item
+    update_item, delete_item, update_device_type_name,
+    delete_device_type
 )
 
 
@@ -56,6 +57,31 @@ def render_master_view():
             if selected_type_key:
                 selected_type_id = type_opts[selected_type_key]
                 st.subheader(f"編集: {selected_type_key}")
+                
+                # --- Edit Device Name ---
+                with st.expander("機種名を編集"):
+                    with st.form("edit_type_name_form"):
+                        new_type_name = st.text_input("機種名", value="")
+                        if st.form_submit_button("変更"):
+                            if new_type_name:
+                                if update_device_type_name(selected_type_id, new_type_name):
+                                    st.success("機種名を変更しました")
+                                    st.rerun()
+                                else:
+                                    st.error("エラー: その機種名は既に使用されている可能性があります")
+
+                # --- Delete Device Type ---
+                with st.expander("機種を削除", expanded=False):
+                    st.warning("⚠️ 注意: この機種を削除すると、紐付いている全ての実機（ユニット）、貸出履歴、点検記録が完全に削除されます。この操作は取り消せません。")
+                    if st.button("この機種を完全に削除する", type="primary"):
+                        from src.database import delete_device_type
+                        success, msg = delete_device_type(selected_type_id)
+                        if success:
+                            st.warning(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                            
                 st.divider()
                 
                 # --- Section 1: Unit Info ---
