@@ -1,0 +1,11 @@
+[
+  {
+    "id": 2,
+    "device_type_id": 2,
+    "lot_number": "1234",
+    "mfg_date": "2025/12/25",
+    "location": "\u7b2c\u4e09\u5225\u99282\u968e",
+    "note": null,
+    "status": "in_stock"
+  }
+]

@@ -755,11 +755,5 @@ def get_unit_status_counts():
     conn.close()
     return dict(rows)
 
-def get_unit_status_counts():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT status, COUNT(*) FROM device_units GROUP BY status")
-    rows = c.fetchall()
-    conn.close()
-    return dict(rows)
+
 
