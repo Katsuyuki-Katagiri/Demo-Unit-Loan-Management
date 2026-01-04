@@ -6,7 +6,8 @@ from src.database import (
     get_all_categories, create_device_type, get_device_types,
     create_item, get_all_items, add_template_line, get_template_lines,
     create_device_unit, get_device_units, add_unit_override, 
-    get_unit_overrides, update_device_unit, UPLOAD_DIR
+    get_unit_overrides, update_device_unit, UPLOAD_DIR,
+    update_item, delete_item
 )
 
 
@@ -207,3 +208,33 @@ def render_master_view():
                         if os.path.exists(fp):
                             c_img.image(fp)
                     c_txt.write(i['tips'])
+                    
+                    st.divider()
+                    st.caption("編集 / 削除")
+                    with st.form(f"edit_item_{i['id']}"):
+                        new_name = st.text_input("構成品名", value=i['name'])
+                        new_tips = st.text_area("Tips", value=i['tips'])
+                        new_file = st.file_uploader("写真更新", key=f"file_{i['id']}")
+                        
+                        c_upd, c_del = st.columns(2)
+                        
+                        if c_upd.form_submit_button("更新"):
+                            photo_path = ""
+                            if new_file:
+                                save_name = new_file.name
+                                save_path = os.path.join(UPLOAD_DIR, save_name)
+                                with open(save_path, "wb") as f:
+                                    f.write(new_file.getbuffer())
+                                photo_path = save_name
+                                
+                            if update_item(i['id'], new_name, new_tips, photo_path):
+                                st.success("更新しました")
+                                st.rerun()
+                                
+                        if c_del.form_submit_button("削除", type="primary"):
+                            success, msg = delete_item(i['id'])
+                            if success:
+                                st.warning(msg)
+                                st.rerun()
+                            else:
+                                st.error(msg)

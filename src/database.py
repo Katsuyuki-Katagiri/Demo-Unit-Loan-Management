@@ -341,6 +341,43 @@ def get_all_items():
     conn.close()
     return res
 
+def update_item(item_id: int, name: str, tips: str, photo_path: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        if photo_path:
+            c.execute("UPDATE items SET name=?, tips=?, photo_path=? WHERE id=?", (name, tips, photo_path, item_id))
+        else:
+            c.execute("UPDATE items SET name=?, tips=? WHERE id=?", (name, tips, item_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(e)
+        return False
+    finally:
+        conn.close()
+
+def delete_item(item_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # 1. Check if used in check_lines (History)
+        c.execute("SELECT count(*) FROM check_lines WHERE item_id = ?", (item_id,))
+        if c.fetchone()[0] > 0:
+            return False, "使用履歴があるため削除できません。"
+
+        # 2. Safe to delete -> Remove from templates and overrides first
+        c.execute("DELETE FROM template_lines WHERE item_id = ?", (item_id,))
+        c.execute("DELETE FROM unit_overrides WHERE item_id = ?", (item_id,))
+        c.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        
+        conn.commit()
+        return True, "削除しました。"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
 # -- Templates --
 def add_template_line(device_type_id: int, item_id: int, required_qty: int):
     conn = sqlite3.connect(DB_PATH)
