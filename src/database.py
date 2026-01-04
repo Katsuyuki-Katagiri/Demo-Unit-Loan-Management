@@ -401,6 +401,22 @@ def get_device_unit_by_id(unit_id: int):
     conn.close()
     return res
 
+def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: str):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("""
+            UPDATE device_units 
+            SET lot_number = ?, mfg_date = ?, location = ?
+            WHERE id = ?
+        """, (lot_number, mfg_date, location, unit_id))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        return False
+    finally:
+        conn.close()
+
 def update_unit_status(unit_id: int, status: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()

@@ -5,7 +5,7 @@ from src.database import (
     get_all_categories, create_device_type, get_device_types,
     create_item, get_all_items, add_template_line, get_template_lines,
     create_device_unit, get_device_units, add_unit_override, 
-    get_unit_overrides, UPLOAD_DIR
+    get_unit_overrides, update_device_unit, UPLOAD_DIR
 )
 
 
@@ -82,33 +82,54 @@ def render_master_view():
 
                 st.divider()
 
-                # --- Section 2: Units ---
-                st.markdown("#### ② ロット一覧 (Units)")
-                st.caption("この機種の実機（ロット）を管理します。")
+                # --- Section 2: Unit Info ---
+                st.markdown("#### ② ロット情報 (Unit Info)")
+                st.caption("この機種の実機（ロット）を管理します。※1機種につき1台のみ登録可能です")
                 
                 # List Units
                 units = get_device_units(selected_type_id)
+                
                 if units:
+                    # EDIT MODE
+                    unit = units[0] # Single unit constraint
+                    
+                    # Display current info
+                    st.success(f"登録済み: Lot {unit['lot_number']} (ID: {unit['id']})")
                     st.dataframe(
-                        [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location']} for u in units],
+                        [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location'], "Mfg Date": u['mfg_date']} for u in units],
                         use_container_width=True
                     )
+
+                    with st.expander("ロット情報を編集", expanded=False):
+                        with st.form("edit_unit_form"):
+                            c1, c2 = st.columns(2)
+                            new_lot = c1.text_input("ロット番号", value=unit['lot_number'])
+                            new_loc = c2.text_input("保管場所", value=unit['location'] if unit['location'] else "")
+                            new_mfg = st.text_input("製造年月日", value=unit['mfg_date'] if unit['mfg_date'] else "")
+                            
+                            if st.form_submit_button("更新"):
+                                if new_lot:
+                                    if update_device_unit(unit['id'], new_lot, new_mfg, new_loc):
+                                        st.success("更新しました")
+                                        st.rerun()
+                                    else:
+                                        st.error("更新失敗 (重複など)")
                 else:
-                    st.info("登録済みのロットはありません。")
-                
-                with st.expander("新規ロット登録"):
-                    with st.form("add_unit_quick"):
-                        c1, c2 = st.columns(2)
-                        lot_num = c1.text_input("ロット番号 (必須)")
-                        loc = c2.text_input("保管場所")
-                        mfg = st.text_input("製造年月日")
-                        if st.form_submit_button("登録"):
-                            if lot_num:
-                                if create_device_unit(selected_type_id, lot_num, mfg, loc):
-                                    st.success(f"登録しました: {lot_num}")
-                                    st.rerun()
-                                else:
-                                    st.error("登録失敗 (重複など)")
+                    # CREATE MODE
+                    st.info("まだ登録されていません。")
+                    with st.expander("新規ロット登録", expanded=True):
+                        with st.form("add_unit_quick"):
+                            c1, c2 = st.columns(2)
+                            lot_num = c1.text_input("ロット番号 (必須)")
+                            loc = c2.text_input("保管場所")
+                            mfg = st.text_input("製造年月日")
+                            if st.form_submit_button("登録"):
+                                if lot_num:
+                                    if create_device_unit(selected_type_id, lot_num, mfg, loc):
+                                        st.success(f"登録しました: {lot_num}")
+                                        st.rerun()
+                                    else:
+                                        st.error("登録失敗 (重複など)")
 
 
 
