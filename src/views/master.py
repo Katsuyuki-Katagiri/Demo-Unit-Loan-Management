@@ -56,28 +56,20 @@ def render_master_view():
                 st.subheader(f"編集: {selected_type_key}")
                 st.divider()
                 
-                # Sub Tabs for the selected device
-                sub_tab1, sub_tab2, sub_tab3 = st.tabs([
-                    "① 標準構成 (Template)", 
-                    "② ロット一覧 (Units)", 
-                    "③ 個体差分 (Overrides)"
-                ])
+                # --- Section 1: Template ---
+                st.markdown("#### ① 標準構成 (Template)")
+                st.caption("この機種の標準的な付属品（チェックリスト）を定義します。")
                 
-                # --- Sub Tab 1: Template ---
-                with sub_tab1:
-                    st.caption("この機種の標準的な付属品（チェックリスト）を定義します。")
-                    
-                    # Current Template
-                    current_lines = get_template_lines(selected_type_id)
-                    if current_lines:
-                        st.markdown("**現在の構成:**")
-                        for line in current_lines:
-                            st.text(f"・ {line['item_name']} (必要数: {line['required_qty']})")
-                    else:
-                        st.info("構成品が登録されていません。")
-                    
-                    st.markdown("---")
-                    st.markdown("**構成品を追加**")
+                # Current Template
+                current_lines = get_template_lines(selected_type_id)
+                if current_lines:
+                    st.markdown("**現在の構成:**")
+                    for line in current_lines:
+                        st.text(f"・ {line['item_name']} (必要数: {line['required_qty']})")
+                else:
+                    st.info("構成品が登録されていません。")
+                
+                with st.expander("構成品を追加/編集"):
                     with st.form("add_tpl_line"):
                         all_items = get_all_items()
                         item_opts = {f"{i['name']}": i['id'] for i in all_items}
@@ -88,22 +80,23 @@ def render_master_view():
                             st.success("更新しました")
                             st.rerun()
 
-                # --- Sub Tab 2: Units ---
-                with sub_tab2:
-                    st.caption("この機種の実機（ロット）を管理します。")
-                    
-                    # List Units
-                    units = get_device_units(selected_type_id)
-                    if units:
-                        st.dataframe(
-                            [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location']} for u in units],
-                            use_container_width=True
-                        )
-                    else:
-                        st.info("登録済みのロットはありません。")
-                    
-                    st.markdown("---")
-                    st.markdown("**新規ロット登録**")
+                st.divider()
+
+                # --- Section 2: Units ---
+                st.markdown("#### ② ロット一覧 (Units)")
+                st.caption("この機種の実機（ロット）を管理します。")
+                
+                # List Units
+                units = get_device_units(selected_type_id)
+                if units:
+                    st.dataframe(
+                        [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location']} for u in units],
+                        use_container_width=True
+                    )
+                else:
+                    st.info("登録済みのロットはありません。")
+                
+                with st.expander("新規ロット登録"):
                     with st.form("add_unit_quick"):
                         c1, c2 = st.columns(2)
                         lot_num = c1.text_input("ロット番号 (必須)")
@@ -117,30 +110,31 @@ def render_master_view():
                                 else:
                                     st.error("登録失敗 (重複など)")
 
-                # --- Sub Tab 3: Overrides ---
-                with sub_tab3:
-                    st.caption("特定のロットだけ構成品が異なる場合（欠品や追加）に設定します。")
+                st.divider()
+
+                # --- Section 3: Overrides ---
+                st.markdown("#### ③ 個体差分 (Overrides)")
+                st.caption("特定のロットだけ構成品が異なる場合（欠品や追加）に設定します。")
+                
+                # Select Unit
+                units_ov = get_device_units(selected_type_id)
+                if not units_ov:
+                    st.warning("先に「ロット一覧」でロットを登録してください。")
+                else:
+                    unit_opts = {f"Lot: {u['lot_number']}": u['id'] for u in units_ov}
+                    sel_unit_key_ov = st.selectbox("対象ロットを選択", options=list(unit_opts.keys()))
+                    sel_unit_id_ov = unit_opts[sel_unit_key_ov]
                     
-                    # Select Unit
-                    units_ov = get_device_units(selected_type_id)
-                    if not units_ov:
-                        st.warning("先に「ロット一覧」でロットを登録してください。")
+                    # Show Overrides
+                    overrides = get_unit_overrides(sel_unit_id_ov)
+                    if overrides:
+                        st.markdown("**設定済みの差分:**")
+                        for ov in overrides:
+                            st.write(f"- {ov['item_name']}: {ov['action']} (Qty: {ov['qty']})")
                     else:
-                        unit_opts = {f"Lot: {u['lot_number']}": u['id'] for u in units_ov}
-                        sel_unit_key_ov = st.selectbox("対象ロットを選択", options=list(unit_opts.keys()))
-                        sel_unit_id_ov = unit_opts[sel_unit_key_ov]
-                        
-                        # Show Overrides
-                        overrides = get_unit_overrides(sel_unit_id_ov)
-                        if overrides:
-                            st.markdown("**設定済みの差分:**")
-                            for ov in overrides:
-                                st.write(f"- {ov['item_name']}: {ov['action']} (Qty: {ov['qty']})")
-                        else:
-                            st.info("差分設定はありません（標準構成と同じ）")
-                        
-                        st.markdown("---")
-                        st.markdown("**差分を追加**")
+                        st.info("差分設定はありません（標準構成と同じ）")
+                    
+                    with st.expander("差分設定を追加"):
                         with st.form("add_ov_quick"):
                             all_items_ov = get_all_items()
                             item_opts_ov = {f"{i['name']}": i['id'] for i in all_items_ov}
