@@ -9,7 +9,7 @@ from src.database import (
 )
 
 def render_settings_view():
-    st.title("⚙️ 設定 (Settings)")
+    st.title("⚙️ 設定")
     
     st.info("通知グループとSMTP設定を管理します。")
     
@@ -52,7 +52,7 @@ def render_settings_view():
                 
     # --- Notification Groups ---
     with tab2:
-        st.header("通知グループ (Notification Groups)")
+        st.header("通知グループ")
         st.caption("カテゴリごとの異常発生時の通知先を設定します。")
         
         categories = get_all_categories()
@@ -96,7 +96,7 @@ def render_settings_view():
 
     # --- Logs ---
     with tab3:
-        st.header("通知ログ (Logs)")
+        st.header("通知ログ")
         if st.button("更新"):
             st.rerun()
             

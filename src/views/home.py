@@ -70,7 +70,7 @@ def render_home_view():
                             st.rerun()
             
             # --- History Section ---
-            with st.expander("貸出履歴 / 取消 (History)"):
+            with st.expander("貸出履歴 / 取消"):
                 from src.database import get_loan_history
                 history = get_loan_history(unit_id)
                 if not history:
@@ -191,7 +191,7 @@ def render_home_view():
 
     # --- Level 0: Categories (Home) ---
     else:
-        st.title("🏠 機材貸出ホーム (Home)")
+        st.title("🏠 機材貸出ホーム")
         
         # --- Dashboard Summary ---
         from src.database import get_unit_status_counts
@@ -203,10 +203,10 @@ def render_home_view():
         needs_attention = status_counts.get('needs_attention', 0)
         
         m1, m2, m3, m4 = st.columns(4)
-        m1.metric("総台数 (Total)", total)
-        m2.metric("在庫あり (In Stock)", in_stock)
-        m3.metric("貸出中 (Loaned)", loaned)
-        m4.metric("⚠️ 要対応 (Attention)", needs_attention, delta_color="inverse")
+        m1.metric("総台数", total)
+        m2.metric("在庫あり", in_stock)
+        m3.metric("貸出中", loaned)
+        m4.metric("⚠️ 要対応", needs_attention, delta_color="inverse")
         
         if needs_attention > 0:
             st.toast(f"要対応の機材が {needs_attention} 台あります！", icon="⚠️")

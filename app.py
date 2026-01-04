@@ -41,13 +41,13 @@ def main():
         
         # Navigation Menu
         # Key-Value pair for cleaner code or just list? List is fine for simple app.
-        page_options = ["ホーム (Home)"]
+        page_options = ["ホーム"]
         
-        page_options.append("分析 (Analytics)")
+        page_options.append("分析")
         
         if st.session_state.get('user_role') == 'admin':
-            page_options.append("マスタ管理 (Master)")
-            page_options.append("設定 (Settings)")
+            page_options.append("マスタ管理")
+            page_options.append("設定")
             
         selected_page = st.radio("メニュー", page_options)
         
@@ -57,14 +57,14 @@ def main():
             st.rerun()
 
     # Routing
-    if selected_page == "ホーム (Home)":
+    if selected_page == "ホーム":
         render_home_view()
-    elif selected_page == "分析 (Analytics)":
+    elif selected_page == "分析":
         from src.views.analytics import render_analytics_view
         render_analytics_view()
-    elif selected_page == "マスタ管理 (Master)":
+    elif selected_page == "マスタ管理":
         render_master_view()
-    elif selected_page == "設定 (Settings)":
+    elif selected_page == "設定":
         from src.views.settings import render_settings_view
         render_settings_view()
 
