@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import shutil
+from datetime import datetime, date
 from src.database import (
     get_all_categories, create_device_type, get_device_types,
     create_item, get_all_items, add_template_line, get_template_lines,
@@ -85,7 +86,7 @@ def render_master_view():
                         # Display current info
                         st.success(f"登録済み: Lot {unit['lot_number']}")
                         st.dataframe(
-                            [{"ロット": u['lot_number'], "保管場所": u['location'], "製造年月日": u['mfg_date']} for u in units],
+                            [{"ロット": u['lot_number'], "保管場所": u['location'], "製造年月日": u['mfg_date'], "点検実施日": u['last_check_date'], "次回点検予定日": u['next_check_date']} for u in units],
                             use_container_width=True
                         )
 
@@ -96,9 +97,25 @@ def render_master_view():
                                 new_loc = c2.text_input("保管場所", value=unit['location'] if unit['location'] else "")
                                 new_mfg = st.text_input("製造年月日", value=unit['mfg_date'] if unit['mfg_date'] else "")
                                 
+                                c3, c4 = st.columns(2)
+                                # Helper for date input
+                                def parse_date(d_str):
+                                    if d_str:
+                                        try:
+                                            return datetime.strptime(d_str, '%Y-%m-%d').date()
+                                        except:
+                                            return None
+                                    return None
+
+                                last_check = c3.date_input("点検実施日", value=parse_date(unit['last_check_date']))
+                                next_check = c4.date_input("次回点検予定日", value=parse_date(unit['next_check_date']))
+                                
                                 if st.form_submit_button("更新"):
+                                    l_str = last_check.strftime('%Y-%m-%d') if last_check else ""
+                                    n_str = next_check.strftime('%Y-%m-%d') if next_check else ""
+                                    
                                     if new_lot:
-                                        if update_device_unit(unit['id'], new_lot, new_mfg, new_loc):
+                                        if update_device_unit(unit['id'], new_lot, new_mfg, new_loc, l_str, n_str):
                                             st.success("更新しました")
                                             st.rerun()
                                         else:
@@ -112,9 +129,17 @@ def render_master_view():
                             lot_num = c1.text_input("ロット番号 (必須)")
                             loc = c2.text_input("保管場所")
                             mfg = st.text_input("製造年月日")
+                            
+                            c3, c4 = st.columns(2)
+                            last_check = c3.date_input("点検実施日", value=None)
+                            next_check = c4.date_input("次回点検予定日", value=None)
+
                             if st.form_submit_button("登録"):
+                                l_str = last_check.strftime('%Y-%m-%d') if last_check else ""
+                                n_str = next_check.strftime('%Y-%m-%d') if next_check else ""
+
                                 if lot_num:
-                                    if create_device_unit(selected_type_id, lot_num, mfg, loc):
+                                    if create_device_unit(selected_type_id, lot_num, mfg, loc, l_str, n_str):
                                         st.success(f"登録しました: {lot_num}")
                                         st.rerun()
                                     else:

@@ -76,6 +76,8 @@ def init_db():
             location TEXT,
             note TEXT,
             status TEXT DEFAULT 'in_stock',
+            last_check_date TEXT,
+            next_check_date TEXT,
             FOREIGN KEY (device_type_id) REFERENCES device_types (id),
             UNIQUE(device_type_id, lot_number)
         )
@@ -225,6 +227,8 @@ def init_db():
     
     conn.commit()
     conn.close()
+    
+    migrate_dates()
 
 # --- User & Auth ---
 
@@ -368,14 +372,14 @@ def get_template_lines(device_type_id: int):
     return res
 
 # -- Device Units --
-def create_device_unit(device_type_id: int, lot_number: str, mfg_date: str = "", location: str = ""):
+def create_device_unit(device_type_id: int, lot_number: str, mfg_date: str = "", location: str = "", last_check_date: str = "", next_check_date: str = ""):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
         c.execute("""
-            INSERT INTO device_units (device_type_id, lot_number, mfg_date, location) 
-            VALUES (?, ?, ?, ?)
-        """, (device_type_id, lot_number, mfg_date, location))
+            INSERT INTO device_units (device_type_id, lot_number, mfg_date, location, last_check_date, next_check_date) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (device_type_id, lot_number, mfg_date, location, last_check_date, next_check_date))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -401,15 +405,15 @@ def get_device_unit_by_id(unit_id: int):
     conn.close()
     return res
 
-def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: str):
+def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: str, last_check_date: str, next_check_date: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
         c.execute("""
             UPDATE device_units 
-            SET lot_number = ?, mfg_date = ?, location = ?
+            SET lot_number = ?, mfg_date = ?, location = ?, last_check_date = ?, next_check_date = ?
             WHERE id = ?
-        """, (lot_number, mfg_date, location, unit_id))
+        """, (lot_number, mfg_date, location, last_check_date, next_check_date, unit_id))
         conn.commit()
         return True
     except sqlite3.IntegrityError:
@@ -799,7 +803,30 @@ def migrate_phase5():
     """Create Phase 5 tables if they don't exist."""
     print("Migrating Phase 5...")
     init_db() # init_db now includes Phase 5 tables, so running it checks and creates them safely
+    migrate_dates() # Ensure dates are added
     print("Phase 5 Migration Complete (via init_db check).")
+
+def migrate_dates():
+    """Add date columns to device_units if missing."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("PRAGMA table_info(device_units)")
+    cols = [r[1] for r in c.fetchall()]
+    
+    if 'last_check_date' not in cols:
+        try:
+            c.execute("ALTER TABLE device_units ADD COLUMN last_check_date TEXT")
+            print("Added last_check_date")
+        except: pass
+        
+    if 'next_check_date' not in cols:
+        try:
+            c.execute("ALTER TABLE device_units ADD COLUMN next_check_date TEXT")
+            print("Added next_check_date")
+        except: pass
+    
+    conn.commit()
+    conn.close()
 
 def get_unit_status_counts():
     conn = sqlite3.connect(DB_PATH)
