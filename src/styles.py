@@ -1,0 +1,157 @@
+import streamlit as st
+
+def apply_custom_css():
+    """
+    Applies global custom CSS for a stylish, white-based design.
+    """
+    st.markdown("""
+        <style>
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+        /* Global Font Settings */
+        html, body, [class*="css"]  {
+            font-family: 'Noto Sans JP', sans-serif;
+            color: #333333;
+            background-color: #FFFFFF;
+        }
+        
+        /* Material Icons Class */
+        .material-symbols-rounded {
+            font-family: 'Material Symbols Rounded';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;  /* Default size */
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+            vertical-align: middle;
+            /* Support for all WebKit browsers. */
+            -webkit-font-smoothing: antialiased;
+            /* Support for Safari and Chrome. */
+            text-rendering: optimizeLegibility;
+            /* Support for Firefox. */
+            -moz-osx-font-smoothing: grayscale;
+            /* Support for IE. */
+            font-feature-settings: 'liga';
+        }
+
+        /* --- Headings --- */
+        h1, h2, h3 {
+            font-weight: 700;
+            color: #1E3A8A; /* Deep Blue */
+            margin-bottom: 0.5em;
+        }
+        h1 {
+            border-bottom: 2px solid #E5E7EB;
+            padding-bottom: 0.3em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* --- Metrics Cards --- */
+        div[data-testid="stMetric"] {
+            background-color: #FFFFFF;
+            border: 1px solid #F3F4F6;
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            min-height: 80px; /* Reduced from 120px */
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Vertical center */
+            align-items: center;     /* Horizontal center */
+            margin-top: 20px;        /* Move down from header */
+        }
+        
+        div[data-testid="stMetric"] label {
+            width: 100%;
+            justify-content: center;
+            color: #6B7280; /* Muted text */
+            font-size: 0.9em;
+            margin-bottom: 5px; /* Adjust spacing */
+        }
+        
+        div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+            width: 100%;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: 700;
+            color: #1E3A8A;
+            padding-bottom: 0px !important; /* Remove excessive padding if any */
+        }
+
+        /* --- Containers / Cards --- */
+        /* Target generic containers or expanders to look like cards */
+        div[data-testid="stExpander"], div[data-testid="stForm"] {
+            background-color: #FFFFFF;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid #F3F4F6;
+            margin-bottom: 1em;
+            padding: 1em;
+        }
+
+        /* --- Buttons --- */
+        div.stButton > button {
+            border-radius: 8px;
+            border: 1px solid #E5E7EB;
+            background-color: #F9FAFB;
+            color: #374151;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        div.stButton > button:hover {
+            border-color: #1E3A8A;
+            color: #1E3A8A;
+            background-color: #EFF6FF;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+
+        /* Primary Button (Action) */
+        div.stButton > button[kind="primary"] {
+            background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+            color: #FFFFFF;
+            border: none;
+            box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3);
+        }
+        div.stButton > button[kind="primary"]:hover {
+            box-shadow: 0 6px 8px rgba(59, 130, 246, 0.4);
+            transform: translateY(-1px);
+        }
+
+        /* --- Inputs --- */
+        input[type="text"], input[type="number"], textarea, select {
+            border-radius: 6px;
+            border: 1px solid #D1D5DB;
+        }
+        
+        /* --- Sidebar --- */
+        section[data-testid="stSidebar"] {
+            background-color: #F8FAFC;
+            border-right: 1px solid #E5E7EB;
+        }
+
+        /* Custom utility classes */
+        .card {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        
+        .header-icon {
+            font-size: 32px;
+            color: #1E3A8A;
+            vertical-align: bottom;
+            margin-right: 8px;
+        }
+        </style>
+    """, unsafe_allow_html=True)

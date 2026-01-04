@@ -6,7 +6,8 @@ from src.database import get_device_units, get_device_types, get_all_categories
 from src.logic import calculate_utilization
 
 def render_analytics_view():
-    st.title("📊 分析")
+    from src.ui import render_header
+    render_header("分析", "analytics")
     
     st.subheader("稼働率レポート")
     st.caption("定義: 期間内の (貸出日数 / 期間日数) * 100。同日貸出は1日、メンテナンス/Issue対応中も貸出(占有)とみなす場合はロジック調整が必要（現在はLoanレコードのみ集計）。")

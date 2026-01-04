@@ -3,7 +3,8 @@ from src.database import create_initial_admin
 import time
 
 def render_setup_view():
-    st.title("初期セットアップ")
+    from src.ui import render_header
+    render_header("初期セットアップ", "settings_system_daydream")
     st.warning("管理者が登録されていません。最初の管理者を作成してください。")
     
     with st.form("setup_form"):

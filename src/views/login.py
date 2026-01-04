@@ -2,7 +2,8 @@ import streamlit as st
 from src.auth import login_user
 
 def render_login_view():
-    st.title("ログイン")
+    from src.ui import render_header
+    render_header("ログイン", "login")
     
     with st.form("login_form"):
         email = st.text_input("メールアドレス")

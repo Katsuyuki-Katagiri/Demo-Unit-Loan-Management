@@ -141,18 +141,17 @@ def render_home_view():
             st.write("")
             # Check conditions for Loan/Return
             
-            # Custom CSS for tall buttons (Primary Only)
-            # Streamlit buttons with type="primary" have kind="primary" attribute in newer versions or specific classes.
-            # Using partial selector for data-testid or kind might be safer.
-            # However, looking at DOM, usually `button[kind="primary"]` works for st.button(type="primary").
+            # Custom CSS for tall buttons (Primary Only) - Scoped to this view effectively by context
             st.markdown("""
                 <style>
+                /* Inherit global styles but force size for Home Action Buttons */
                 div.stButton > button[kind="primary"] {
-                    height: 100px;
-                    font-size: 1.5em;
-                    font-weight: bold;
+                    height: 100px !important;
+                    font-size: 1.5em !important;
+                    font-weight: bold !important;
+                    /* Ensure gradient from global styles isn't overridden if specific rules existed, 
+                       but here we only touch geometry. */
                 }
-                /* Fallback for older streamlit versions if 'kind' attr isn't present, though less likely to be needed based on context */
                 </style>
             """, unsafe_allow_html=True)
             active_loan = get_active_loan(unit_id)
@@ -311,7 +310,8 @@ def render_home_view():
 
     # --- Level 0: Categories (Home) ---
     else:
-        st.title("🏠 機材貸出ホーム")
+        from src.ui import render_header
+        render_header("機材貸出ホーム", "home")
         
         # --- Dashboard Summary ---
         from src.database import get_unit_status_counts

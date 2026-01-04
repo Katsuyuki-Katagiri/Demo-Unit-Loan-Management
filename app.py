@@ -15,6 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Apply Global Styles
+from src.styles import apply_custom_css
+apply_custom_css()
+
 # Initialize DB on start
 if 'db_initialized' not in st.session_state:
     init_db()

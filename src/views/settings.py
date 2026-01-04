@@ -9,7 +9,8 @@ from src.database import (
 )
 
 def render_settings_view():
-    st.title("⚙️ 設定")
+    from src.ui import render_header
+    render_header("設定", "settings")
     
     st.info("通知グループとSMTP設定を管理します。")
     

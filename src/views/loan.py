@@ -18,7 +18,8 @@ def render_loan_view(unit_id: int):
 
     type_info = get_device_type_by_id(unit['device_type_id'])
     
-    st.title("機材貸出登録 (Checkout)")
+    from src.ui import render_header
+    render_header("機材貸出登録", "shopping_cart_checkout")
     st.markdown(f"**{type_info['name']}** (Lot: {unit['lot_number']})")
     
     # Back Button

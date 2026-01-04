@@ -13,7 +13,8 @@ from src.database import (
 
 
 def render_master_view():
-    st.title("マスタ管理")
+    from src.ui import render_header
+    render_header("マスタ管理", "settings")
     
     # Main Tabs
     main_tab1, main_tab2 = st.tabs([
