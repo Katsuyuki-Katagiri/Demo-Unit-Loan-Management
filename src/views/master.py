@@ -10,12 +10,12 @@ from src.database import (
 
 
 def render_master_view():
-    st.title("マスタ管理 (Master Management)")
+    st.title("マスタ管理")
     
     # Main Tabs
     main_tab1, main_tab2 = st.tabs([
-        "機種管理 (Device Management)", 
-        "構成品マスタ (Item Master)"
+        "機種管理", 
+        "構成品マスタ"
     ])
     
     # --- Tab 1: Device Management Hub ---
@@ -56,8 +56,74 @@ def render_master_view():
                 st.subheader(f"編集: {selected_type_key}")
                 st.divider()
                 
-                # --- Section 1: Template ---
-                st.markdown("#### ① 標準構成 (Template)")
+                # --- Section 1: Unit Info ---
+                st.markdown("#### ① ロット情報")
+                st.caption("この機種の実機（ロット）を管理します。※1機種につき1台のみ登録可能です")
+                
+                # List Units
+                units = get_device_units(selected_type_id)
+                
+                if units:
+                    # Check for duplicates
+                    if len(units) > 1:
+                        st.error(f"⚠️ エラー: 複数のロット({len(units)}台)が登録されています。不要なデータを削除してください。")
+                        for u in units:
+                            with st.container(border=True):
+                                c1, c2, c3 = st.columns([2, 2, 1])
+                                c1.write(f"Lot: **{u['lot_number']}** (ID: {u['id']})")
+                                c2.caption(f"Status: {u['status']} | Loc: {u['location']}")
+                                if c3.button("削除", key=f"del_unit_{u['id']}", type="primary"):
+                                    from src.database import delete_device_unit
+                                    delete_device_unit(u['id'])
+                                    st.warning(f"ID: {u['id']} を削除しました")
+                                    st.rerun()
+
+                    else:
+                        # EDIT MODE (Single Unit)
+                        unit = units[0] 
+                        
+                        # Display current info
+                        st.success(f"登録済み: Lot {unit['lot_number']} (ID: {unit['id']})")
+                        st.dataframe(
+                            [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location'], "Mfg Date": u['mfg_date']} for u in units],
+                            use_container_width=True
+                        )
+
+                        with st.expander("ロット情報を編集", expanded=False):
+                            with st.form("edit_unit_form"):
+                                c1, c2 = st.columns(2)
+                                new_lot = c1.text_input("ロット番号", value=unit['lot_number'])
+                                new_loc = c2.text_input("保管場所", value=unit['location'] if unit['location'] else "")
+                                new_mfg = st.text_input("製造年月日", value=unit['mfg_date'] if unit['mfg_date'] else "")
+                                
+                                if st.form_submit_button("更新"):
+                                    if new_lot:
+                                        if update_device_unit(unit['id'], new_lot, new_mfg, new_loc):
+                                            st.success("更新しました")
+                                            st.rerun()
+                                        else:
+                                            st.error("更新失敗 (重複など)")
+                else:
+                    # CREATE MODE
+                    st.info("まだ登録されていません。")
+                    with st.expander("新規ロット登録", expanded=True):
+                        with st.form("add_unit_quick"):
+                            c1, c2 = st.columns(2)
+                            lot_num = c1.text_input("ロット番号 (必須)")
+                            loc = c2.text_input("保管場所")
+                            mfg = st.text_input("製造年月日")
+                            if st.form_submit_button("登録"):
+                                if lot_num:
+                                    if create_device_unit(selected_type_id, lot_num, mfg, loc):
+                                        st.success(f"登録しました: {lot_num}")
+                                        st.rerun()
+                                    else:
+                                        st.error("登録失敗 (重複など)")
+
+                st.divider()
+
+                # --- Section 2: Component List (formerly Template) ---
+                st.markdown("#### ② 構成品一覧")
                 st.caption("この機種の標準的な付属品（チェックリスト）を定義します。")
                 
                 # Current Template
@@ -79,57 +145,6 @@ def render_master_view():
                             add_template_line(selected_type_id, item_opts[sel_item_key], req_qty)
                             st.success("更新しました")
                             st.rerun()
-
-                st.divider()
-
-                # --- Section 2: Unit Info ---
-                st.markdown("#### ② ロット情報 (Unit Info)")
-                st.caption("この機種の実機（ロット）を管理します。※1機種につき1台のみ登録可能です")
-                
-                # List Units
-                units = get_device_units(selected_type_id)
-                
-                if units:
-                    # EDIT MODE
-                    unit = units[0] # Single unit constraint
-                    
-                    # Display current info
-                    st.success(f"登録済み: Lot {unit['lot_number']} (ID: {unit['id']})")
-                    st.dataframe(
-                        [{"ID": u['id'], "Lot": u['lot_number'], "Status": u['status'], "Location": u['location'], "Mfg Date": u['mfg_date']} for u in units],
-                        use_container_width=True
-                    )
-
-                    with st.expander("ロット情報を編集", expanded=False):
-                        with st.form("edit_unit_form"):
-                            c1, c2 = st.columns(2)
-                            new_lot = c1.text_input("ロット番号", value=unit['lot_number'])
-                            new_loc = c2.text_input("保管場所", value=unit['location'] if unit['location'] else "")
-                            new_mfg = st.text_input("製造年月日", value=unit['mfg_date'] if unit['mfg_date'] else "")
-                            
-                            if st.form_submit_button("更新"):
-                                if new_lot:
-                                    if update_device_unit(unit['id'], new_lot, new_mfg, new_loc):
-                                        st.success("更新しました")
-                                        st.rerun()
-                                    else:
-                                        st.error("更新失敗 (重複など)")
-                else:
-                    # CREATE MODE
-                    st.info("まだ登録されていません。")
-                    with st.expander("新規ロット登録", expanded=True):
-                        with st.form("add_unit_quick"):
-                            c1, c2 = st.columns(2)
-                            lot_num = c1.text_input("ロット番号 (必須)")
-                            loc = c2.text_input("保管場所")
-                            mfg = st.text_input("製造年月日")
-                            if st.form_submit_button("登録"):
-                                if lot_num:
-                                    if create_device_unit(selected_type_id, lot_num, mfg, loc):
-                                        st.success(f"登録しました: {lot_num}")
-                                        st.rerun()
-                                    else:
-                                        st.error("登録失敗 (重複など)")
 
 
 

@@ -417,6 +417,44 @@ def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: s
     finally:
         conn.close()
 
+def delete_device_unit(unit_id: int):
+    """Delete a unit and all its related history (Cascade)."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # Delete related tables
+        # 1. Get loan IDs
+        c.execute("SELECT id FROM loans WHERE device_unit_id = ?", (unit_id,))
+        loan_ids = [r[0] for r in c.fetchall()]
+        
+        # 2. Get check_session IDs
+        c.execute("SELECT id FROM check_sessions WHERE device_unit_id = ?", (unit_id,))
+        session_ids = [r[0] for r in c.fetchall()]
+        
+        if session_ids:
+            placeholders = ','.join(['?']*len(session_ids))
+            c.execute(f"DELETE FROM check_lines WHERE check_session_id IN ({placeholders})", session_ids)
+            c.execute(f"DELETE FROM issues WHERE check_session_id IN ({placeholders})", session_ids)
+            
+        c.execute("DELETE FROM issues WHERE device_unit_id = ?", (unit_id,))
+        c.execute("DELETE FROM check_sessions WHERE device_unit_id = ?", (unit_id,))
+        
+        if loan_ids:
+            placeholders = ','.join(['?']*len(loan_ids))
+            c.execute(f"DELETE FROM returns WHERE loan_id IN ({placeholders})", loan_ids)
+            
+        c.execute("DELETE FROM loans WHERE device_unit_id = ?", (unit_id,))
+        c.execute("DELETE FROM unit_overrides WHERE device_unit_id = ?", (unit_id,))
+        c.execute("DELETE FROM device_units WHERE id = ?", (unit_id,))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(e)
+        return False
+    finally:
+        conn.close()
+
 def update_unit_status(unit_id: int, status: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
