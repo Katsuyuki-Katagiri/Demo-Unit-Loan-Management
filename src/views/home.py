@@ -278,6 +278,9 @@ def render_home_view():
                 units = get_device_units(t['id'])
                 label = t['name']
                 if units:
+                    # Append Lot Number
+                    label += f" (Lot: {units[0]['lot_number']})"
+                    
                     status = units[0]['status']
                     if status == 'in_stock':
                         label += " 【✅ 在庫あり】"
