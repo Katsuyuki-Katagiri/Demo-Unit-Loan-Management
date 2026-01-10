@@ -264,6 +264,26 @@ def render_home_view():
     # --- Level 1: Device Types List ---
     elif st.session_state.get('selected_category_id'):
         cat_id = st.session_state['selected_category_id']
+        
+        # --- Dashboard Summary (Category Specific) ---
+        from src.database import get_unit_status_counts
+        status_counts = get_unit_status_counts(cat_id)
+        
+        total = sum(status_counts.values())
+        in_stock = status_counts.get('in_stock', 0)
+        loaned = status_counts.get('loaned', 0)
+        needs_attention = status_counts.get('needs_attention', 0)
+        
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("総台数", total)
+        m2.metric("在庫あり", in_stock)
+        m3.metric("貸出中", loaned)
+        m4.metric("⚠️ 要対応", needs_attention, delta_color="inverse")
+        
+        if needs_attention > 0:
+            st.toast(f"このカテゴリーに要対応の機材が {needs_attention} 台あります！", icon="⚠️")
+            
+        st.divider()
         # Need category name? logic to fetch...
         # For now just show types
         st.header("機種一覧")
@@ -313,25 +333,8 @@ def render_home_view():
         from src.ui import render_header
         render_header("機材貸出ホーム", "home")
         
-        # --- Dashboard Summary ---
-        from src.database import get_unit_status_counts
-        status_counts = get_unit_status_counts()
-        
-        total = sum(status_counts.values())
-        in_stock = status_counts.get('in_stock', 0)
-        loaned = status_counts.get('loaned', 0)
-        needs_attention = status_counts.get('needs_attention', 0)
-        
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric("総台数", total)
-        m2.metric("在庫あり", in_stock)
-        m3.metric("貸出中", loaned)
-        m4.metric("⚠️ 要対応", needs_attention, delta_color="inverse")
-        
-        if needs_attention > 0:
-            st.toast(f"要対応の機材が {needs_attention} 台あります！", icon="⚠️")
-            
-        st.divider()
+        # Dashboard summary moved to category view (Level 1)
+        st.write("")
         
         st.markdown("### 装置選択")
         categories = get_all_categories()

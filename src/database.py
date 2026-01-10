@@ -922,10 +922,21 @@ def migrate_dates():
     conn.commit()
     conn.close()
 
-def get_unit_status_counts():
+def get_unit_status_counts(category_id: int = None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("SELECT status, COUNT(*) FROM device_units GROUP BY status")
+    
+    if category_id:
+        c.execute("""
+            SELECT u.status, COUNT(*) 
+            FROM device_units u
+            JOIN device_types t ON u.device_type_id = t.id
+            WHERE t.category_id = ?
+            GROUP BY u.status
+        """, (category_id,))
+    else:
+        c.execute("SELECT status, COUNT(*) FROM device_units GROUP BY status")
+        
     rows = c.fetchall()
     conn.close()
     return dict(rows)
