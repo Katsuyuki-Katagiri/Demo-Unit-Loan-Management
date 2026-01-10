@@ -171,32 +171,67 @@ def render_home_view():
             # Check conditions for Loan/Return
             
             # Custom CSS for tall buttons (Primary Only) - Scoped to this view effectively by context
-            st.markdown("""
+            active_loan = get_active_loan(unit_id)
+            
+            # Re-check issues (might be resolved just now)
+            can_loan = (unit['status'] == 'in_stock') and (not issues)
+            can_return = (unit['status'] == 'loaned') or (active_loan)
+            
+            # Custom CSS for tall buttons (Primary Only) - Scoped to this view effectively by context
+            # Base style for size
+            base_style = """
                 <style>
-                /* Inherit global styles but force size for Home Action Buttons */
                 div.stButton > button[kind="primary"] {
                     height: 100px !important;
                     font-size: 1.5em !important;
                     font-weight: bold !important;
-                    /* Ensure gradient from global styles isn't overridden if specific rules existed, 
-                       but here we only touch geometry. */
+                    color: white !important;
                 }
                 </style>
-            """, unsafe_allow_html=True)
+            """
+            st.markdown(base_style, unsafe_allow_html=True)
+
             active_loan = get_active_loan(unit_id)
             
             # Re-check issues (might be resolved just now)
-            # But 'issues' variable is from before resolution. Rerun handles display update.
-            # Button logic:
             can_loan = (unit['status'] == 'in_stock') and (not issues)
             can_return = (unit['status'] == 'loaned') or (active_loan)
             
             if can_loan:
+                # Inject Blue Color
+                st.markdown("""
+                    <style>
+                    div.stButton > button[kind="primary"] {
+                        background-color: #2196F3 !important;
+                        border-color: #2196F3 !important;
+                    }
+                    div.stButton > button[kind="primary"]:hover {
+                        background-color: #1976D2 !important;
+                        border-color: #1976D2 !important;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+                
                 if st.button("📦 貸出登録 (Checkout)", type="primary", use_container_width=True):
                     st.session_state['loan_mode'] = True
                     st.rerun()
                 st.markdown("<div style='text-align: center; color: gray; font-size: 0.8em; margin-top: -10px; margin-bottom: 20px;'>貸出登録は、上記ボタンから行ってください</div>", unsafe_allow_html=True)
+            
             elif can_return:
+                 # Inject Red Color
+                 st.markdown("""
+                    <style>
+                    div.stButton > button[kind="primary"] {
+                        background-color: #F44336 !important;
+                        border-color: #F44336 !important;
+                    }
+                    div.stButton > button[kind="primary"]:hover {
+                        background-color: #D32F2F !important;
+                        border-color: #D32F2F !important;
+                    }
+                    </style>
+                 """, unsafe_allow_html=True)
+                 
                  if st.button("↩️ 返却登録 (Return)", type="primary", use_container_width=True):
                     st.session_state['return_mode'] = True
                     st.rerun()
@@ -360,7 +395,7 @@ def render_home_view():
     # --- Level 0: Categories (Home) ---
     else:
         from src.ui import render_header
-        render_header("機材貸出ホーム", "home")
+        render_header("デモ機管理アプリ", "home")
         
         # Dashboard summary moved to category view (Level 1)
         st.write("")

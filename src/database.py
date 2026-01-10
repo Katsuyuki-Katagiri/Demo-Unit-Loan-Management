@@ -956,6 +956,8 @@ def get_unit_status_counts(category_id: int = None):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
+
+    
     if category_id:
         c.execute("""
             SELECT u.status, COUNT(*) 
@@ -970,6 +972,66 @@ def get_unit_status_counts(category_id: int = None):
     rows = c.fetchall()
     conn.close()
     return dict(rows)
+
+def reset_database_keep_admin():
+    """
+    DANGER: Resets the database, keeping ONLY the admin@example.com user.
+    Deletes all logic data, transaction data, and other users.
+    Re-seeds categories.
+    Clears uploads directory.
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    try:
+        # 1. Delete Transaction Data (Child tables first)
+        c.execute("DELETE FROM check_lines")
+        c.execute("DELETE FROM issues")
+        c.execute("DELETE FROM returns")
+        c.execute("DELETE FROM check_sessions")
+        c.execute("DELETE FROM loans")
+        c.execute("DELETE FROM notification_logs")
+        
+        # 2. Delete Logic/Master Data
+        c.execute("DELETE FROM unit_overrides")
+        c.execute("DELETE FROM template_lines")
+        c.execute("DELETE FROM device_units")
+        c.execute("DELETE FROM items")
+        c.execute("DELETE FROM device_types")
+        c.execute("DELETE FROM notification_groups")
+        
+        # 3. Delete Categories (Will be re-seeded)
+        c.execute("DELETE FROM categories")
+        
+        # 4. Delete Users except admin@example.com
+        # Note: If admin@example.com doesn't exist, this leaves table empty (which triggers setup view)
+        c.execute("DELETE FROM users WHERE email != 'admin@example.com'")
+        
+        # 5. Clear Uploads
+        if os.path.exists(UPLOAD_DIR):
+            for filename in os.listdir(UPLOAD_DIR):
+                file_path = os.path.join(UPLOAD_DIR, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        import shutil
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f'Failed to delete {file_path}. Reason: {e}')
+                    
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+        
+    # Re-seed static data
+    seed_categories()
+    
+    return True
+
 
 
 

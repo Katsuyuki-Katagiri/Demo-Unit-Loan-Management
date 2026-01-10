@@ -265,3 +265,49 @@ def render_master_view():
                                 st.rerun()
                             else:
                                 st.error(msg)
+    
+    # --- Tab 3: Data Management (Admin Only) ---
+    current_user_email = st.session_state.get('user_email', '')
+    
+    st.divider()
+    st.caption(f" Debug Info: 現在のログインユーザー = '{current_user_email}'")
+    
+    # Add tab if admin
+    if current_user_email == 'admin@example.com':
+        # Re-create tabs to include Data Management
+        # Note: Streamlit tabs must be defined at once.
+        # Since we defined tabs at the top, we can't easily add one here without restructuring.
+        # So we will append it below for now, but with clear visibility.
+        
+        st.markdown("## 🛠️ データ管理エリア")
+        
+        with st.expander("データベース初期化 (Admin Only)", expanded=True):
+            st.error("⚠️ 危険エリア: ここでの操作は取り消せません")
+            st.write(f"認証済み管理者: {current_user_email}")
+            
+            st.subheader("データベース初期化")
+            st.markdown("""
+                以下のデータを**全て削除**し、システムを初期状態に戻します。
+                - 全ての機材・構成品登録
+                - 全ての貸出・返却・点検記録
+                - `admin@example.com` 以外の全ユーザー
+                - アップロードされた全画像ファイル
+                
+                ※カテゴリー情報は初期値にリセットされます。
+                ※**この管理者アカウント (admin@example.com) は削除されません。**
+            """)
+            
+            confirm_reset = st.checkbox("上記を確認し、本当にデータを削除することに同意します (I agree to wipe all data)")
+            
+            if st.button("システムを完全初期化する", type="primary", disabled=not confirm_reset):
+                from src.database import reset_database_keep_admin
+                with st.spinner("初期化中..."):
+                    if reset_database_keep_admin():
+                        st.success("初期化が完了しました。")
+                        st.balloons()
+                        st.session_state['db_initialized'] = False
+                        st.rerun()
+                    else:
+                        st.error("初期化に失敗しました。")
+    else:
+        st.warning("⚠️ データ初期化機能は `admin@example.com` アカウントでのみ表示されます。")

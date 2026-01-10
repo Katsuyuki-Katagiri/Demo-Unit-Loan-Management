@@ -9,7 +9,7 @@ from src.views.master import render_master_view
 
 # Page configuration
 st.set_page_config(
-    page_title="機材貸出管理",
+    page_title="デモ機管理アプリ",
     page_icon="🏥",
     layout="wide", # Phase 1: Wide layout for better tables/grids
     initial_sidebar_state="expanded"

@@ -24,6 +24,7 @@ def login_user(email: str, password: str) -> bool:
     if check_password(password, stored_hash):
         st.session_state['user_id'] = user['id']
         st.session_state['user_name'] = user['name']
+        st.session_state['user_email'] = user['email'] # Fixed: Save email to session
         st.session_state['user_role'] = user['role']
         st.session_state['logged_in'] = True
         return True
