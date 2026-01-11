@@ -14,7 +14,7 @@ def render_settings_view():
     
     st.info("通知グループとSMTP設定、およびユーザーを管理します。")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["📧 SMTP設定", "👥 通知グループ", "👤 ユーザー管理", "📜 通知ログ"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📧 SMTP設定", "👤 ユーザー管理", "👥 通知グループ", "📜 通知ログ"])
     
     # --- SMTP Configuration ---
     with tab1:
@@ -51,55 +51,8 @@ def render_settings_view():
                 save_system_setting('smtp_config', json.dumps(new_config))
                 st.success("SMTP設定を保存しました。")
                 
-    # --- Notification Groups ---
-    with tab2:
-        st.header("通知グループ")
-        st.caption("カテゴリごとの異常発生時の通知先を設定します。")
-        
-        categories = get_all_categories()
-        cat_map = {c['name']: c['id'] for c in categories}
-        if cat_map:
-            selected_cat_name = st.selectbox("カテゴリ選択", list(cat_map.keys()))
-            
-            if selected_cat_name:
-                cat_id = cat_map[selected_cat_name]
-                members = get_notification_members(cat_id)
-                
-                # Show current members
-                st.subheader(f"Current Members for {selected_cat_name}")
-                if members:
-                    for m in members:
-                        c1, c2 = st.columns([4, 1])
-                        c1.write(f"👤 {m['name']} ({m['email']})")
-                        if c2.button("削除", key=f"del_{m['id']}"):
-                            remove_notification_member(cat_id, m['id'])
-                            st.rerun()
-                else:
-                    st.write("メンバーがいません。")
-                
-                st.divider()
-                
-                # Add Member
-                st.subheader("メンバー追加")
-                all_users = get_all_users()
-                # Filter out existing members
-                member_ids = [m['id'] for m in members]
-                available_users = [u for u in all_users if u['id'] not in member_ids]
-                
-                if available_users:
-                    u_map = {f"{u['name']} ({u['email']})": u['id'] for u in available_users}
-                    selected_user_label = st.selectbox("ユーザー選択", list(u_map.keys()))
-                    if st.button("追加"):
-                        add_notification_member(cat_id, u_map[selected_user_label])
-                        st.success("メンバーを追加しました。")
-                        st.rerun()
-                else:
-                    st.info("追加可能なユーザーがいません（全員追加済みか、ユーザーマスタが空です）。")
-        else:
-            st.warning("カテゴリが登録されていません。マスタ管理で登録してください。")
-
     # --- User Management ---
-    with tab3:
+    with tab2:
         st.header("ユーザー管理")
         st.caption("システムにログインできるユーザーを追加・削除します。")
 
@@ -150,6 +103,53 @@ def render_settings_view():
                             st.error(msg)
         else:
             st.info("ユーザーがいません。")
+
+    # --- Notification Groups ---
+    with tab3:
+        st.header("通知グループ")
+        st.caption("カテゴリごとの異常発生時の通知先を設定します。")
+        
+        categories = get_all_categories()
+        cat_map = {c['name']: c['id'] for c in categories}
+        if cat_map:
+            selected_cat_name = st.selectbox("カテゴリ選択", list(cat_map.keys()))
+            
+            if selected_cat_name:
+                cat_id = cat_map[selected_cat_name]
+                members = get_notification_members(cat_id)
+                
+                # Show current members
+                st.subheader(f"Current Members for {selected_cat_name}")
+                if members:
+                    for m in members:
+                        c1, c2 = st.columns([4, 1])
+                        c1.write(f"👤 {m['name']} ({m['email']})")
+                        if c2.button("削除", key=f"del_{m['id']}"):
+                            remove_notification_member(cat_id, m['id'])
+                            st.rerun()
+                else:
+                    st.write("メンバーがいません。")
+                
+                st.divider()
+                
+                # Add Member
+                st.subheader("メンバー追加")
+                all_users = get_all_users()
+                # Filter out existing members
+                member_ids = [m['id'] for m in members]
+                available_users = [u for u in all_users if u['id'] not in member_ids]
+                
+                if available_users:
+                    u_map = {f"{u['name']} ({u['email']})": u['id'] for u in available_users}
+                    selected_user_label = st.selectbox("ユーザー選択", list(u_map.keys()))
+                    if st.button("追加"):
+                        add_notification_member(cat_id, u_map[selected_user_label])
+                        st.success("メンバーを追加しました。")
+                        st.rerun()
+                else:
+                    st.info("追加可能なユーザーがいません（全員追加済みか、ユーザーマスタが空です）。")
+        else:
+            st.warning("カテゴリが登録されていません。マスタ管理で登録してください。")
 
     # --- Logs ---
     with tab4:
