@@ -237,7 +237,7 @@ def render_master_view():
         
         col_i1, col_i2 = st.columns([1, 2])
         with col_i1:
-            with st.form("add_item_global"):
+            with st.form("add_item_global", clear_on_submit=True):
                 item_name = st.text_input("構成品名")
                 item_tips = st.text_area("確認時のTips")
                 uploaded_file = st.file_uploader("写真", type=['png', 'jpg', 'jpeg'])
