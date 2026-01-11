@@ -17,10 +17,40 @@ def render_master_view():
     render_header("マスタ管理", "settings")
     
     # Main Tabs
-    main_tab1, main_tab2 = st.tabs([
+    main_tab1, main_tab2, main_tab3 = st.tabs([
         "機種管理", 
-        "構成品マスタ"
+        "構成品マスタ",
+        "カテゴリ設定"
     ])
+    
+    # --- Tab 3: Category Visibility ---
+    with main_tab3:
+        st.header("カテゴリ表示設定")
+        st.caption("ホーム画面に表示する装置カテゴリのON/OFFを切り替えます。")
+        
+        from src.database import update_category_visibility
+        
+        cats = get_all_categories()
+        # cats rows: id, name, is_visible
+        
+        if cats:
+            for c in cats:
+                # Default is_visible=1 if None (for safety, though migration sets default)
+                is_vis = bool(c['is_visible']) if 'is_visible' in c.keys() and c['is_visible'] is not None else True
+                
+                c1, c2 = st.columns([4, 1])
+                c1.subheader(c['name'])
+                if c2.toggle("表示", value=is_vis, key=f"cat_vis_{c['id']}"):
+                    if not is_vis:
+                        update_category_visibility(c['id'], True)
+                        st.rerun()
+                else:
+                    if is_vis:
+                        update_category_visibility(c['id'], False)
+                        st.rerun()
+                st.divider()
+        else:
+            st.info("カテゴリがありません")
     
     # --- Tab 1: Device Management Hub ---
     with main_tab1:

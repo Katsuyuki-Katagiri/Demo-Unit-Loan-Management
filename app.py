@@ -22,6 +22,10 @@ apply_custom_css()
 # Initialize DB on start
 if 'db_initialized' not in st.session_state:
     init_db()
+    # Migration for new features
+    from src.database import migrate_category_visibility
+    migrate_category_visibility()
+    
     seed_categories()
     st.session_state['db_initialized'] = True
 

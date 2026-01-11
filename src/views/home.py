@@ -403,9 +403,13 @@ def render_home_view():
         st.markdown("### 装置選択")
         categories = get_all_categories()
         
+        # Filter visible only
+        # sqlite3.Row does not support .get(), so we check keys or assume existence
+        visible_cats = [c for c in categories if (c['is_visible'] if 'is_visible' in c.keys() else 1) == 1]
+        
         # Grid layout
         cols = st.columns(3)
-        for i, cat in enumerate(categories):
+        for i, cat in enumerate(visible_cats):
             col = cols[i % 3]
             with col:
                 # Big Button Style

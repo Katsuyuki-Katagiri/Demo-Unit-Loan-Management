@@ -350,6 +350,38 @@ def get_all_categories():
     conn.close()
     return res
 
+def migrate_category_visibility():
+    """Migrate categories table to include is_visible column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # Check if column exists
+        c.execute("PRAGMA table_info(categories)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'is_visible' not in columns:
+            print("Migrating categories: adding is_visible column...")
+            c.execute("ALTER TABLE categories ADD COLUMN is_visible INTEGER DEFAULT 1")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
+def update_category_visibility(category_id: int, is_visible: bool):
+    """Update visibility status of a category."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        val = 1 if is_visible else 0
+        c.execute("UPDATE categories SET is_visible = ? WHERE id = ?", (val, category_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(e)
+        return False
+    finally:
+        conn.close()
+
 # -- Device Types --
 def create_device_type(category_id: int, name: str):
     conn = sqlite3.connect(DB_PATH)
