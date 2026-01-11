@@ -250,6 +250,10 @@ def render_master_view():
                     if item_name:
                         photo_path = ""
                         if uploaded_file:
+                            if uploaded_file.size > 5 * 1024 * 1024:
+                                st.error("ファイルサイズが大きすぎます (上限5MB)")
+                                return
+
                             save_name = uploaded_file.name
                             save_path = os.path.join(UPLOAD_DIR, save_name)
                             with open(save_path, "wb") as f:

@@ -47,7 +47,9 @@ def render_loan_view(unit_id: int):
         purpose = st.selectbox("貸出目的", purpose_options)
         
     st.subheader("写真記録 (必須)")
-    uploaded_files = st.file_uploader("貸出時の写真をアップロードしてください (最低1枚)", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
+    st.info("ファイル選択、またはカメラで撮影してください")
+    uploaded_files = st.file_uploader("写真アップロード", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
+    camera_image = st.camera_input("カメラで撮影")
     
     st.subheader("構成品チェック")
     
@@ -139,8 +141,8 @@ def render_loan_view(unit_id: int):
     errors = []
     if not destination:
         errors.append("貸出先を入力してください")
-    if not uploaded_files:
-        errors.append("写真を最低1枚アップロードしてください")
+    if not uploaded_files and not camera_image:
+        errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
         
     if errors:
         for e in errors:
@@ -150,6 +152,18 @@ def render_loan_view(unit_id: int):
         if st.button("貸出を確定する", type="primary"):
             # Process Submission
             
+            # Check file sizes
+            if uploaded_files:
+                for uf in uploaded_files:
+                    if uf.size > 5 * 1024 * 1024:
+                        st.error(f"ファイルサイズが大きすぎます: {uf.name} (上限5MB)")
+                        st.stop()
+            
+            if camera_image:
+                if camera_image.size > 5 * 1024 * 1024:
+                    st.error("カメラ撮影画像のサイズが大きすぎます (上限5MB)")
+                    st.stop()
+
             # 1. Save Photos
             # Create a specific directory for this session photos?
             # Or just unique filenames in uploads?
@@ -161,9 +175,16 @@ def render_loan_view(unit_id: int):
             abs_session_dir = os.path.join(UPLOAD_DIR, session_dir_name)
             os.makedirs(abs_session_dir, exist_ok=True)
             
-            for uf in uploaded_files:
-                with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                    f.write(uf.getbuffer())
+            if uploaded_files:
+                for uf in uploaded_files:
+                    with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
+                        f.write(uf.getbuffer())
+            
+            if camera_image:
+                # Save camera image with a unique name
+                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.jpg"
+                with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
+                    f.write(camera_image.getbuffer())
                     
             # 2. Build Check Results List
             check_results_list = []

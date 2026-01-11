@@ -66,7 +66,9 @@ def render_return_view(unit_id: int):
     return_date = st.date_input("返却日", value=datetime.date.today())
     
     st.subheader("写真記録 (必須)")
-    uploaded_files = st.file_uploader("返却時の写真をアップロードしてください (最低1枚)", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'], key="return_uploader")
+    st.info("ファイル選択、またはカメラで撮影してください")
+    uploaded_files = st.file_uploader("写真アップロード", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'], key="return_uploader")
+    camera_image = st.camera_input("カメラで撮影", key="return_camera")
     
     st.subheader("構成品チェック")
     
@@ -142,8 +144,8 @@ def render_return_view(unit_id: int):
     
     # Error Display
     errors = []
-    if not uploaded_files:
-        errors.append("写真を最低1枚アップロードしてください")
+    if not uploaded_files and not camera_image:
+        errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
         
     if errors:
         for e in errors:
@@ -153,15 +155,34 @@ def render_return_view(unit_id: int):
         if st.button("返却を確定する", type="primary", key="btn_ret_submit"):
             # Process Submission
             
+            # Check file sizes
+            if uploaded_files:
+                for uf in uploaded_files:
+                    if uf.size > 5 * 1024 * 1024:
+                        st.error(f"ファイルサイズが大きすぎます: {uf.name} (上限5MB)")
+                        st.stop()
+            
+            if camera_image:
+                if camera_image.size > 5 * 1024 * 1024:
+                    st.error("カメラ撮影画像のサイズが大きすぎます (上限5MB)")
+                    st.stop()
+
             # 1. Save Photos
             timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             session_dir_name = f"return_{unit_id}_{timestamp_str}"
             abs_session_dir = os.path.join(UPLOAD_DIR, session_dir_name)
             os.makedirs(abs_session_dir, exist_ok=True)
             
-            for uf in uploaded_files:
-                with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                    f.write(uf.getbuffer())
+            if uploaded_files:
+                for uf in uploaded_files:
+                    with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
+                        f.write(uf.getbuffer())
+            
+            if camera_image:
+                # Save camera image with a unique name
+                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.jpg"
+                with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
+                    f.write(camera_image.getbuffer())
                     
             # 2. Build Check Results List
             check_results_list = []
