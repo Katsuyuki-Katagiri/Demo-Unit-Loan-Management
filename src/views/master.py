@@ -27,30 +27,71 @@ def render_master_view():
     # --- Tab 3: Category Visibility ---
     with main_tab3:
         st.header("カテゴリ表示設定")
-        st.caption("ホーム画面に表示する装置カテゴリのON/OFFを切り替えます。")
+        st.caption("ホーム画面に表示する装置カテゴリのON/OFF、名称変更、追加・削除が行えます。")
         
-        from src.database import update_category_visibility
+        from src.database import (
+            update_category_visibility, create_category, 
+            update_category_name, delete_category
+        )
         
+        # --- Add New Category ---
+        with st.expander("➕ 新しいカテゴリを追加", expanded=False):
+            with st.form("add_cat_form"):
+                new_cat_name = st.text_input("カテゴリ名")
+                if st.form_submit_button("追加"):
+                    if new_cat_name:
+                        success, msg = create_category(new_cat_name)
+                        if success:
+                            st.cache_data.clear()
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                    else:
+                        st.warning("カテゴリ名を入力してください")
+
+        st.divider()
+
         cats = get_all_categories()
         # cats rows: id, name, is_visible
         
         if cats:
             for c in cats:
-                # Default is_visible=1 if None (for safety, though migration sets default)
+                # Default is_visible=1 if None
                 is_vis = bool(c['is_visible']) if 'is_visible' in c.keys() and c['is_visible'] is not None else True
                 
-                c1, c2 = st.columns([4, 1])
-                c1.subheader(c['name'])
-                if c2.toggle("表示", value=is_vis, key=f"cat_vis_{c['id']}"):
-                    if not is_vis:
-                        update_category_visibility(c['id'], True)
-                        st.cache_data.clear()
-                        st.rerun()
-                else:
-                    if is_vis:
-                        update_category_visibility(c['id'], False)
-                        st.cache_data.clear()
-                        st.rerun()
+                with st.container():
+                    c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 0.5])
+                    
+                    # 1. Edit Name
+                    new_name_input = c1.text_input("名称", value=c['name'], key=f"cat_name_{c['id']}", label_visibility="collapsed")
+                    
+                    # 2. Update Name Button
+                    if c2.button("名称変更", key=f"ren_cat_{c['id']}"):
+                        if new_name_input and new_name_input != c['name']:
+                            if update_category_name(c['id'], new_name_input):
+                                st.cache_data.clear()
+                                st.success("変更しました")
+                                st.rerun()
+                    
+                    # 3. Visibility Toggle
+                    # Use a callback or check change
+                    current_toggle = c3.toggle("表示", value=is_vis, key=f"cat_vis_{c['id']}")
+                    if current_toggle != is_vis:
+                         update_category_visibility(c['id'], current_toggle)
+                         st.cache_data.clear()
+                         st.rerun()
+
+                    # 4. Delete Button
+                    if c4.button("🗑️", key=f"del_cat_{c['id']}", help="削除"):
+                         success, msg = delete_category(c['id'])
+                         if success:
+                             st.cache_data.clear()
+                             st.success(msg)
+                             st.rerun()
+                         else:
+                             st.error(msg)
+                             
                 st.divider()
         else:
             st.info("カテゴリがありません")

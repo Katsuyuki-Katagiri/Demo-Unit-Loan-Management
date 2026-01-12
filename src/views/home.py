@@ -145,7 +145,8 @@ def render_home_view():
                             if sess: carrier_name = sess['performed_by']
 
                         st.markdown(f"**{l['checkout_date']}** - {l['destination']} ({l['purpose']})")
-                        st.caption(f"Status: {l['status']} | 持出者: {carrier_name} | {status_icon}")
+                        assetment_label = "Assetment登録: 済" if 'assetment_checked' in l.keys() and l['assetment_checked'] else "Assetment登録: 未"
+                        st.caption(f"Status: {l['status']} | 持出者: {carrier_name} | {status_icon} | {assetment_label}")
                         
                         # Cancel Button (Only if not already canceled)
                         if not l['canceled']:
@@ -161,6 +162,15 @@ def render_home_view():
                             for sess in sessions:
                                 s_type_label = "貸出時チェック" if sess['session_type'] == 'checkout' else "返却時チェック"
                                 with st.expander(f"📋 {s_type_label} 詳細 ({sess['performed_at']})"):
+                                    # Special display for Assetment check in Checkout
+                                    if sess['session_type'] == 'checkout':
+                                        # sqlite3.Row does not support .get(), so convert to dict or check keys
+                                        is_checked = l['assetment_checked'] if 'assetment_checked' in l.keys() else 0
+                                        if is_checked:
+                                            st.success("✅ AssetmentNeo 登録確認済み")
+                                        else:
+                                            st.warning("⚠️ AssetmentNeo 登録未確認")
+                                        st.divider()
                                     # Show Photos
                                     if sess['device_photo_dir']:
                                         photo_dir_path = os.path.join(UPLOAD_DIR, sess['device_photo_dir'])

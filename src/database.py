@@ -385,6 +385,54 @@ def update_category_visibility(category_id: int, is_visible: bool):
     finally:
         conn.close()
 
+def create_category(name: str):
+    """Create a new category."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO categories (name, is_visible) VALUES (?, 1)", (name,))
+        conn.commit()
+        return True, "カテゴリを作成しました"
+    except sqlite3.IntegrityError:
+        return False, "カテゴリ作成エラー (重複など)"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def update_category_name(category_id: int, new_name: str):
+    """Update the name of a category."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE categories SET name = ? WHERE id = ?", (new_name, category_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating category: {e}")
+        return False
+    finally:
+        conn.close()
+
+def delete_category(category_id: int):
+    """Delete a category if it has no associated device types."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # Check for dependencies
+        c.execute("SELECT count(*) FROM device_types WHERE category_id = ?", (category_id,))
+        count = c.fetchone()[0]
+        if count > 0:
+            return False, f"このカテゴリには {count} 件の機種が登録されているため削除できません。"
+        
+        c.execute("DELETE FROM categories WHERE id = ?", (category_id,))
+        conn.commit()
+        return True, "カテゴリを削除しました"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
 # -- Device Types --
 def create_device_type(category_id: int, name: str):
     conn = sqlite3.connect(DB_PATH)
@@ -701,19 +749,39 @@ def create_issue(device_unit_id: int, check_session_id: int, summary: str, creat
 
 # -- Phase 2 Operations --
 
+def migrate_loans_assetment_check():
+    """Migrate loans table to include assetment_checked column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(loans)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'assetment_checked' not in columns:
+            print("Migrating loans: adding assetment_checked column...")
+            c.execute("ALTER TABLE loans ADD COLUMN assetment_checked INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 def create_loan(
     device_unit_id: int, 
     checkout_date: str, 
     destination: str, 
     purpose: str, 
-    checker_user_id: Optional[int] = None
+    checker_user_id: Optional[int] = None,
+    assetment_checked: bool = False
 ) -> int:
+    # Ensure migration has run (safe to call repeatedly as it checks existence)
+    migrate_loans_assetment_check()
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO loans (device_unit_id, checkout_date, destination, purpose, checker_user_id, status)
-        VALUES (?, ?, ?, ?, ?, 'open')
-    """, (device_unit_id, checkout_date, destination, purpose, checker_user_id))
+        INSERT INTO loans (device_unit_id, checkout_date, destination, purpose, checker_user_id, status, assetment_checked)
+        VALUES (?, ?, ?, ?, ?, 'open', ?)
+    """, (device_unit_id, checkout_date, destination, purpose, checker_user_id, 1 if assetment_checked else 0))
     loan_id = c.lastrowid
     conn.commit()
     conn.close()

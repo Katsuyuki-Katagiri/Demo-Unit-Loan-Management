@@ -178,7 +178,13 @@ def render_loan_view(unit_id: int):
                     st.session_state['checklist_data'][item_id]['comment'] = comm
 
 
+
     st.divider()
+    st.markdown("### 外部システム登録確認")
+    assetment_checked = st.checkbox("AssetmentNeoの貸出登録は済んでいますか？")
+    if not assetment_checked:
+        st.info("💡 貸出登録が済んでいない場合は [https://saas.assetment.net/AS3230-PA0200320/](https://saas.assetment.net/AS3230-PA0200320/) から貸出登録を行ってから持出お願いします")
+
     
     # Error Display
     errors = []
@@ -186,6 +192,8 @@ def render_loan_view(unit_id: int):
         errors.append("貸出先を入力してください")
     if not uploaded_files and not camera_image:
         errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
+    if not assetment_checked:
+        errors.append("AssetmentNeoの登録確認を行ってください")
         
     if errors:
         for e in errors:
@@ -195,18 +203,6 @@ def render_loan_view(unit_id: int):
         if st.button("貸出を確定する", type="primary"):
             # Process Submission
             
-            # Check file sizes
-            if uploaded_files:
-                for uf in uploaded_files:
-                    if uf.size > 5 * 1024 * 1024:
-                        st.error(f"ファイルサイズが大きすぎます: {uf.name} (上限5MB)")
-                        st.stop()
-            
-            if camera_image:
-                if camera_image.size > 5 * 1024 * 1024:
-                    st.error("カメラ撮影画像のサイズが大きすぎます (上限5MB)")
-                    st.stop()
-
             # 1. Save Photos
             # Create a specific directory for this session photos?
             # Or just unique filenames in uploads?
@@ -219,18 +215,18 @@ def render_loan_view(unit_id: int):
             os.makedirs(abs_session_dir, exist_ok=True)
             
             if uploaded_files:
-                for uf in uploaded_files:
+                for i, uf in enumerate(uploaded_files):
                     compressed = compress_image(uf)
                     if compressed:
                         # Force .webp extension
-                        base_name, _ = os.path.splitext(uf.name)
+                        base_name = f"photo_upload_{i}"
                         save_name = f"{base_name}.webp"
                         with open(os.path.join(abs_session_dir, save_name), "wb") as f:
-                            f.write(compressed.getbuffer())
+                            f.write(compressed.getvalue())
                     else:
-                        # Fallback
+                        # Fallback (shouldn't happen often)
                         with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                            f.write(uf.getbuffer())
+                            f.write(uf.getvalue())
             
             if camera_image:
                 # Compress camera image too
@@ -239,9 +235,9 @@ def render_loan_view(unit_id: int):
                 
                 with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
                     if compressed_cam:
-                        f.write(compressed_cam.getbuffer())
+                        f.write(compressed_cam.getvalue())
                     else:
-                        f.write(camera_image.getbuffer())
+                        f.write(camera_image.getvalue())
                     
             # 2. Build Check Results List
             check_results_list = []
@@ -273,7 +269,8 @@ def render_loan_view(unit_id: int):
                     purpose=purpose,
                     check_results=check_results_list,
                     photo_dir=session_dir_name, # Relative path
-                    user_name=user_name
+                    user_name=user_name,
+                    assetment_checked=assetment_checked
                 )
                 
                 if result_status == 'loaned':

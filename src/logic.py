@@ -131,7 +131,8 @@ def process_loan(
     check_results: list, # List of dict: {item_id, result, ng_reason, found_qty, comment}
     photo_dir: str,
     user_id: int = None,
-    user_name: str = "Unknown"
+    user_name: str = "Unknown",
+    assetment_checked: bool = False
 ):
     """
     Process a loan request.
@@ -159,7 +160,8 @@ def process_loan(
         checkout_date=checkout_date,
         destination=destination,
         purpose=purpose,
-        checker_user_id=user_id
+        checker_user_id=user_id,
+        assetment_checked=assetment_checked
     )
     
     # 3. Create Check Session
