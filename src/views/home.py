@@ -441,6 +441,16 @@ def render_home_view():
                                 label += f" [備考: {loan_info['notes']}]"
                     elif status == 'needs_attention':
                         label += " 【⚠️ 要対応】"
+                    
+                    # Maintenance Dates
+                    m_text = ""
+                    if units[0]['last_check_date']:
+                        m_text += f" [点検実施日: {units[0]['last_check_date']}]"
+                    if units[0]['next_check_date']:
+                        m_text += f" [次回: {units[0]['next_check_date']}]"
+                    
+                    if m_text:
+                        label += m_text
                 
                 if st.button(label, key=f"type_{t['id']}", use_container_width=True):
                     st.session_state['selected_type_id'] = t['id']
