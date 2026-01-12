@@ -132,7 +132,8 @@ def process_loan(
     photo_dir: str,
     user_id: int = None,
     user_name: str = "Unknown",
-    assetment_checked: bool = False
+    assetment_checked: bool = False,
+    notes: str = None
 ):
     """
     Process a loan request.
@@ -161,7 +162,8 @@ def process_loan(
         destination=destination,
         purpose=purpose,
         checker_user_id=user_id,
-        assetment_checked=assetment_checked
+        assetment_checked=assetment_checked,
+        notes=notes
     )
     
     # 3. Create Check Session

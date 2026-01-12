@@ -180,6 +180,10 @@ def render_loan_view(unit_id: int):
 
 
     st.divider()
+    st.markdown("### 備考（任意）")
+    remarks = st.text_area("自由に記載できます", placeholder="例：〇〇先生使用分、返却予定日など", key="loan_remarks")
+
+    st.divider()
     st.markdown("### 外部システム登録確認")
     assetment_checked = st.checkbox("AssetmentNeoの貸出登録は済んでいますか？")
     if not assetment_checked:
@@ -270,7 +274,8 @@ def render_loan_view(unit_id: int):
                     check_results=check_results_list,
                     photo_dir=session_dir_name, # Relative path
                     user_name=user_name,
-                    assetment_checked=assetment_checked
+                    assetment_checked=assetment_checked,
+                    notes=remarks
                 )
                 
                 if result_status == 'loaned':

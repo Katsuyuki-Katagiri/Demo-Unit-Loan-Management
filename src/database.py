@@ -765,23 +765,42 @@ def migrate_loans_assetment_check():
     finally:
         conn.close()
 
+
+def migrate_loans_notes():
+    """Migrate loans table to include notes column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(loans)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'notes' not in columns:
+            print("Migrating loans: adding notes column...")
+            c.execute("ALTER TABLE loans ADD COLUMN notes TEXT")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 def create_loan(
     device_unit_id: int, 
     checkout_date: str, 
     destination: str, 
     purpose: str, 
     checker_user_id: Optional[int] = None,
-    assetment_checked: bool = False
+    assetment_checked: bool = False,
+    notes: str = None
 ) -> int:
-    # Ensure migration has run (safe to call repeatedly as it checks existence)
+    # Ensure migrations have run
     migrate_loans_assetment_check()
+    migrate_loans_notes()
     
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO loans (device_unit_id, checkout_date, destination, purpose, checker_user_id, status, assetment_checked)
-        VALUES (?, ?, ?, ?, ?, 'open', ?)
-    """, (device_unit_id, checkout_date, destination, purpose, checker_user_id, 1 if assetment_checked else 0))
+        INSERT INTO loans (device_unit_id, checkout_date, destination, purpose, checker_user_id, status, assetment_checked, notes)
+        VALUES (?, ?, ?, ?, ?, 'open', ?, ?)
+    """, (device_unit_id, checkout_date, destination, purpose, checker_user_id, 1 if assetment_checked else 0, notes))
     loan_id = c.lastrowid
     conn.commit()
     conn.close()

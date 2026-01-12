@@ -148,6 +148,9 @@ def render_home_view():
                         assetment_label = "Assetment登録: 済" if 'assetment_checked' in l.keys() and l['assetment_checked'] else "Assetment登録: 未"
                         st.caption(f"Status: {l['status']} | 持出者: {carrier_name} | {status_icon} | {assetment_label}")
                         
+                        if 'notes' in l.keys() and l['notes']:
+                            st.info(f"備考: {l['notes']}")
+                        
                         # Cancel Button (Only if not already canceled)
                         if not l['canceled']:
                             if st.button(f"取消 (Cancel Loan #{l['id']})", key=f"cancel_loan_{l['id']}"):
@@ -434,6 +437,8 @@ def render_home_view():
                                 if sess: carrier_name = sess['performed_by']
 
                             label += f" @ {loan_info['destination']} (持出者: {carrier_name} / {loan_info['checkout_date']})"
+                            if 'notes' in loan_info.keys() and loan_info['notes']:
+                                label += f" [備考: {loan_info['notes']}]"
                     elif status == 'needs_attention':
                         label += " 【⚠️ 要対応】"
                 
