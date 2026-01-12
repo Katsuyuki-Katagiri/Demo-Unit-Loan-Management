@@ -116,9 +116,9 @@ def render_home_view():
                     st.write("履歴なし")
                 else:
                     for l in history:
-                        status_icon = "🟢" if l['status'] == 'open' else "⚫"
                         if l['canceled']:
-                            status_icon = "❌ (Canceled)"
+                            continue
+                        status_icon = "🟢" if l['status'] == 'open' else "⚫"
                         
                         # Determine Carrier Name
                         carrier_name = "Unknown"

@@ -428,6 +428,15 @@ def get_all_items():
     conn.close()
     return res
 
+def get_item_by_exact_name(name: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM items WHERE name = ?", (name,))
+    res = c.fetchone()
+    conn.close()
+    return res
+
 def update_item(item_id: int, name: str, tips: str, photo_path: str):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()

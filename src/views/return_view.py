@@ -180,10 +180,19 @@ def render_return_view(unit_id: int):
                     st.session_state['return_checklist_data'][item_id]['comment'] = comm
 
 
+    
+    
+    # General Check Item
+    st.write("")
+    is_clean_checked = st.checkbox("汚れはありませんか（血液等の汚れはきちんと清掃して下さい）", key="check_clean_ret")
+
     st.divider()
     
     # Error Display
     errors = []
+    if not is_clean_checked:
+        errors.append("「汚れはありませんか」のチェックを確認してください")
+
     if not uploaded_files and not camera_image:
         errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
         
@@ -238,7 +247,27 @@ def render_return_view(unit_id: int):
                     'found_qty': d['found_qty'] if d['result'] == 'NG' and d['ng_reason'] == '数量不足' else None,
                     'comment': d['comment'] if d['result'] == 'NG' else None
                 })
-                
+            
+            # Add Cleaning Check (System Item)
+            from src.database import get_item_by_exact_name, create_item
+            clean_item_name = "汚れチェック"
+            clean_item = get_item_by_exact_name(clean_item_name)
+            if not clean_item:
+                # Create if not exists
+                clean_id = create_item(clean_item_name, "システム自動生成: 返却時の汚れ確認", "")
+            else:
+                clean_id = clean_item['id']
+            
+            check_results_list.append({
+                'item_id': clean_id,
+                'name': clean_item_name,
+                'required_qty': 1,
+                'result': 'OK', # Always OK because it is mandatory to match validation
+                'ng_reason': None,
+                'found_qty': None,
+                'comment': "汚れなし確認済み"
+            })
+
             # 3. Call Logic
             try:
                 user_name = st.session_state.get('user_name', 'Unknown')
