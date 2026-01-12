@@ -3,10 +3,13 @@ from src.database import (
 )
 import sqlite3
 import sqlite3
+import threading
 from PIL import Image, ImageOps # type: ignore
 import base64
 from io import BytesIO
+import streamlit as st
 
+@st.cache_data
 def get_image_base64(image_path):
     """Convert image to base64 string for HTML embedding, max 500px."""
     try:
@@ -19,6 +22,39 @@ def get_image_base64(image_path):
         print(f"Error encoding image: {e}")
         return None
 
+def compress_image(image_file, max_size=(1280, 1280), quality=85):
+    """
+    Compress and resize an image.
+    Args:
+        image_file: UploadedFile or BytesIO object
+        max_size: tuple (width, height) for max dimensions (Default: 1280x1280)
+        quality: WebP quality (1-100) (Default: 85)
+    Returns:
+        BytesIO object containing the compressed WebP image
+    """
+    try:
+        img = Image.open(image_file)
+        
+        # Correct orientation if needed (exif)
+        img = ImageOps.exif_transpose(img)
+        
+        # Convert to RGB (in case of RGBA/PNG)
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+            
+        # Resize if larger than max_size
+        img.thumbnail(max_size, Image.Resampling.LANCZOS)
+        
+        # Save to buffer
+        buf = BytesIO()
+        img.save(buf, format="WEBP", quality=quality, optimize=True)
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"Compression error: {e}")
+        return None
+
+@st.cache_data
 def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     """
     Synthesize the final checklist for a specific unit.
@@ -369,11 +405,19 @@ from src.database import (
 )
 import smtplib
 import json
+import threading
 from email.mime.text import MIMEText
 
 def trigger_issue_notification(device_unit_id: int, issue_id: int, summary: str):
     """
-    Trigger notification for a new issue.
+    Wrapper to trigger notification in background thread.
+    """
+    t = threading.Thread(target=_blocking_issue_notification, args=(device_unit_id, issue_id, summary))
+    t.start()
+
+def _blocking_issue_notification(device_unit_id: int, issue_id: int, summary: str):
+    """
+    Actual notification logic (runs in thread).
     1. Identify Category -> Group Members
     2. Check SMTP Settings
     3. Log and Send (if enabled)

@@ -51,6 +51,11 @@ def render_home_view():
     # --- Level 3: Unit Detail (Checklist) ---
     if st.session_state.get('selected_unit_id'):
         unit_id = st.session_state['selected_unit_id']
+
+        # Reset history limit if unit changed
+        if 'last_viewed_unit_id' not in st.session_state or st.session_state['last_viewed_unit_id'] != unit_id:
+            st.session_state['history_limit'] = 5
+            st.session_state['last_viewed_unit_id'] = unit_id
         
         # Check if in Loan Mode
         if st.session_state.get('loan_mode'):
@@ -111,13 +116,22 @@ def render_home_view():
             # --- History Section ---
             with st.expander("貸出返却履歴"):
                 from src.database import get_loan_history
-                history = get_loan_history(unit_id)
-                if not history:
+                
+                # Pagination State
+                if 'history_limit' not in st.session_state:
+                    st.session_state['history_limit'] = 5
+                
+                # Fetch limit + 1 to check if there are more records
+                fetch_limit = st.session_state['history_limit'] + 1
+                history_batch = get_loan_history(unit_id, limit=fetch_limit, include_canceled=False)
+                
+                has_more = len(history_batch) > st.session_state['history_limit']
+                displayed_history = history_batch[:st.session_state['history_limit']]
+                
+                if not displayed_history:
                     st.write("履歴なし")
                 else:
-                    for l in history:
-                        if l['canceled']:
-                            continue
+                    for l in displayed_history:
                         status_icon = "🟢" if l['status'] == 'open' else "⚫"
                         
                         # Determine Carrier Name
@@ -151,7 +165,7 @@ def render_home_view():
                                     if sess['device_photo_dir']:
                                         photo_dir_path = os.path.join(UPLOAD_DIR, sess['device_photo_dir'])
                                         if os.path.exists(photo_dir_path):
-                                            photos = [f for f in os.listdir(photo_dir_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+                                            photos = [f for f in os.listdir(photo_dir_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
                                             if photos:
                                                 st.caption("記録写真")
                                                 for i in range(0, len(photos), 4):
@@ -177,7 +191,13 @@ def render_home_view():
                                             if line['comment']:
                                                 st.caption(f"Comment: {line['comment']}")
                         
-                        st.divider()
+                        # Stronger Divider
+                        st.markdown("<hr style='border: none; border-top: 3px solid #666; margin: 30px 0;'>", unsafe_allow_html=True)
+                    
+                    if has_more:
+                        if st.button("もっと見る (更に5件表示)", key="show_more_history"):
+                            st.session_state['history_limit'] += 5
+                            st.rerun()
 
         with c2:
             st.write("") # spacer

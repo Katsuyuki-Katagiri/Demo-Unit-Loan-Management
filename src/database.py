@@ -3,6 +3,8 @@ import os
 from typing import Optional, List, Tuple, Dict, Any
 import bcrypt
 
+import streamlit as st
+
 DB_PATH = os.path.join("data", "app.db")
 UPLOAD_DIR = os.path.join("data", "uploads")
 
@@ -341,12 +343,13 @@ def seed_categories():
     conn.commit()
     conn.close()
 
+@st.cache_data
 def get_all_categories():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM categories")
-    res = c.fetchall()
+    res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
 
@@ -390,6 +393,7 @@ def create_device_type(category_id: int, name: str):
     conn.commit()
     return c.lastrowid
 
+@st.cache_data
 def get_device_types(category_id: int = None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -398,7 +402,7 @@ def get_device_types(category_id: int = None):
         c.execute("SELECT * FROM device_types WHERE category_id = ?", (category_id,))
     else:
         c.execute("SELECT * FROM device_types")
-    res = c.fetchall()
+    res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
 
@@ -419,12 +423,13 @@ def create_item(name: str, tips: str = "", photo_path: str = ""):
     conn.commit()
     return c.lastrowid
 
+@st.cache_data
 def get_all_items():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM items")
-    res = c.fetchall()
+    res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
 
@@ -929,15 +934,24 @@ def migrate_phase4():
     conn.commit()
     conn.close()
 
-def get_loan_history(device_unit_id: int):
+def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-    c.execute("""
-        SELECT * FROM loans 
-        WHERE device_unit_id = ?
-        ORDER BY id DESC
-    """, (device_unit_id,))
+    
+    query = "SELECT * FROM loans WHERE device_unit_id = ?"
+    params = [device_unit_id]
+    
+    if not include_canceled:
+        query += " AND (canceled = 0 OR canceled IS NULL)"
+        
+    query += " ORDER BY id DESC"
+    
+    if limit is not None:
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+    c.execute(query, params)
     res = c.fetchall()
     conn.close()
     return res

@@ -4,7 +4,10 @@ import os
 from src.database import (
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR
 )
-from src.logic import get_synthesized_checklist, process_loan, get_image_base64
+from src.logic import get_synthesized_checklist, process_loan, get_image_base64, compress_image
+
+# ... (lines 9-217) ...
+
 
 def render_loan_view(unit_id: int):
     # Retrieve Unit & Type Info
@@ -217,14 +220,28 @@ def render_loan_view(unit_id: int):
             
             if uploaded_files:
                 for uf in uploaded_files:
-                    with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                        f.write(uf.getbuffer())
+                    compressed = compress_image(uf)
+                    if compressed:
+                        # Force .webp extension
+                        base_name, _ = os.path.splitext(uf.name)
+                        save_name = f"{base_name}.webp"
+                        with open(os.path.join(abs_session_dir, save_name), "wb") as f:
+                            f.write(compressed.getbuffer())
+                    else:
+                        # Fallback
+                        with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
+                            f.write(uf.getbuffer())
             
             if camera_image:
-                # Save camera image with a unique name
-                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.jpg"
+                # Compress camera image too
+                compressed_cam = compress_image(camera_image)
+                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.webp"
+                
                 with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
-                    f.write(camera_image.getbuffer())
+                    if compressed_cam:
+                        f.write(compressed_cam.getbuffer())
+                    else:
+                        f.write(camera_image.getbuffer())
                     
             # 2. Build Check Results List
             check_results_list = []

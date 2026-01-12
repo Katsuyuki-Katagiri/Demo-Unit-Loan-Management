@@ -5,7 +5,7 @@ from src.database import (
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR, get_active_loan, get_loan_by_id,
     get_user_by_id, get_check_session_by_loan_id
 )
-from src.logic import get_synthesized_checklist, process_return
+from src.logic import get_synthesized_checklist, process_return, compress_image
 
 def render_return_view(unit_id: int):
     # Retrieve Unit & Type Info
@@ -224,14 +224,24 @@ def render_return_view(unit_id: int):
             
             if uploaded_files:
                 for uf in uploaded_files:
-                    with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                        f.write(uf.getbuffer())
+                    compressed = compress_image(uf)
+                    if compressed:
+                        base_name, _ = os.path.splitext(uf.name)
+                        save_name = f"{base_name}.webp"
+                        with open(os.path.join(abs_session_dir, save_name), "wb") as f:
+                            f.write(compressed.getbuffer())
+                    else:
+                        with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
+                            f.write(uf.getbuffer())
             
             if camera_image:
-                # Save camera image with a unique name
-                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.jpg"
+                compressed_cam = compress_image(camera_image)
+                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.webp"
                 with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
-                    f.write(camera_image.getbuffer())
+                    if compressed_cam:
+                        f.write(compressed_cam.getbuffer())
+                    else:
+                        f.write(camera_image.getbuffer())
                     
             # 2. Build Check Results List
             check_results_list = []

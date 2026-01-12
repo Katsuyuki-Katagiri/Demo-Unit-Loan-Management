@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import shutil
 from datetime import datetime, date
+from src.logic import compress_image
 from src.database import (
     get_all_categories, create_device_type, get_device_types,
     create_item, get_all_items, add_template_line, get_template_lines,
@@ -43,10 +44,12 @@ def render_master_view():
                 if c2.toggle("表示", value=is_vis, key=f"cat_vis_{c['id']}"):
                     if not is_vis:
                         update_category_visibility(c['id'], True)
+                        st.cache_data.clear()
                         st.rerun()
                 else:
                     if is_vis:
                         update_category_visibility(c['id'], False)
+                        st.cache_data.clear()
                         st.rerun()
                 st.divider()
         else:
@@ -69,6 +72,7 @@ def render_master_view():
                     if st.form_submit_button("登録"):
                         if type_name:
                             create_device_type(cat_options[selected_cat], type_name)
+                            st.cache_data.clear()
                             st.success(f"登録しました: {type_name}")
                             st.rerun()
 
@@ -96,6 +100,7 @@ def render_master_view():
                         if st.form_submit_button("変更"):
                             if new_type_name:
                                 if update_device_type_name(selected_type_id, new_type_name):
+                                    st.cache_data.clear()
                                     st.success("機種名を変更しました")
                                     st.rerun()
                                 else:
@@ -108,6 +113,7 @@ def render_master_view():
                         from src.database import delete_device_type
                         success, msg = delete_device_type(selected_type_id)
                         if success:
+                            st.cache_data.clear()
                             st.warning(msg)
                             st.rerun()
                         else:
@@ -134,6 +140,7 @@ def render_master_view():
                                 if c3.button("削除", key=f"del_unit_{u['id']}", type="primary"):
                                     from src.database import delete_device_unit
                                     delete_device_unit(u['id'])
+                                    st.cache_data.clear()
                                     st.warning(f"ID: {u['id']} を削除しました")
                                     st.rerun()
 
@@ -173,6 +180,7 @@ def render_master_view():
                                     
                                     if new_lot:
                                         if update_device_unit(unit['id'], new_lot, new_mfg, new_loc, l_str, n_str):
+                                            st.cache_data.clear()
                                             st.success("更新しました")
                                             st.rerun()
                                         else:
@@ -197,6 +205,7 @@ def render_master_view():
 
                                 if lot_num:
                                     if create_device_unit(selected_type_id, lot_num, mfg, loc, l_str, n_str):
+                                        st.cache_data.clear()
                                         st.success(f"登録しました: {lot_num}")
                                         st.rerun()
                                     else:
@@ -218,6 +227,7 @@ def render_master_view():
                         c1.text(f"・ {line['item_name']} (必要数: {line['required_qty']})")
                         if c2.button("🗑️", key=f"del_line_{line['id']}", help="この構成品を削除"):
                              delete_template_line(selected_type_id, line['item_id'])
+                             st.cache_data.clear()
                              st.rerun()
                 else:
                     st.info("構成品が登録されていません。")
@@ -230,6 +240,7 @@ def render_master_view():
                         req_qty = st.number_input("必要数量", min_value=1, value=1)
                         if st.form_submit_button("追加/更新"):
                             add_template_line(selected_type_id, item_opts[sel_item_key], req_qty)
+                            st.cache_data.clear()
                             st.success("更新しました")
                             st.rerun()
 
@@ -254,12 +265,21 @@ def render_master_view():
                                 st.error("ファイルサイズが大きすぎます (上限5MB)")
                                 return
 
-                            save_name = uploaded_file.name
-                            save_path = os.path.join(UPLOAD_DIR, save_name)
-                            with open(save_path, "wb") as f:
-                                f.write(uploaded_file.getbuffer())
+                            compressed = compress_image(uploaded_file)
+                            if compressed:
+                                base, _ = os.path.splitext(uploaded_file.name)
+                                save_name = f"{base}.webp"
+                                save_path = os.path.join(UPLOAD_DIR, save_name)
+                                with open(save_path, "wb") as f:
+                                    f.write(compressed.getbuffer())
+                            else:
+                                save_name = uploaded_file.name
+                                save_path = os.path.join(UPLOAD_DIR, save_name)
+                                with open(save_path, "wb") as f:
+                                    f.write(uploaded_file.getbuffer())
                             photo_path = save_name
                         create_item(item_name, item_tips, photo_path)
+                        st.cache_data.clear()
                         st.success(f"登録しました: {item_name}")
                         st.rerun()
 
@@ -295,19 +315,29 @@ def render_master_view():
                         if c_upd.form_submit_button("更新"):
                             photo_path = ""
                             if new_file:
-                                save_name = new_file.name
-                                save_path = os.path.join(UPLOAD_DIR, save_name)
-                                with open(save_path, "wb") as f:
-                                    f.write(new_file.getbuffer())
+                                compressed = compress_image(new_file)
+                                if compressed:
+                                    base, _ = os.path.splitext(new_file.name)
+                                    save_name = f"{base}.jpg"
+                                    save_path = os.path.join(UPLOAD_DIR, save_name)
+                                    with open(save_path, "wb") as f:
+                                        f.write(compressed.getbuffer())
+                                else:
+                                    save_name = new_file.name
+                                    save_path = os.path.join(UPLOAD_DIR, save_name)
+                                    with open(save_path, "wb") as f:
+                                        f.write(new_file.getbuffer())
                                 photo_path = save_name
                                 
                             if update_item(i['id'], new_name, new_tips, photo_path):
+                                st.cache_data.clear()
                                 st.success("更新しました")
                                 st.rerun()
                                 
                         if c_del.form_submit_button("削除", type="primary"):
                             success, msg = delete_item(i['id'])
                             if success:
+                                st.cache_data.clear()
                                 st.warning(msg)
                                 st.rerun()
                             else:
