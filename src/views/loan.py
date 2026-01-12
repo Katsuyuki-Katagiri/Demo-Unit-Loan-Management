@@ -48,8 +48,48 @@ def render_loan_view(unit_id: int):
         
     st.subheader("写真記録 (必須)")
     st.info("ファイル選択、またはカメラで撮影してください")
+
+    # Custom CSS for Uploader Localization
+    st.markdown("""
+    <style>
+        /* Localization of Dropzone text */
+        [data-testid="stFileUploaderDropzoneInstructions"] > div > span,
+        [data-testid="stFileUploaderDropzoneInstructions"] > div > small {
+            display: none;
+        }
+        [data-testid="stFileUploaderDropzoneInstructions"] > div::after {
+            content: "ここにファイルをドラッグ＆ドロップ";
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        [data-testid="stFileUploaderDropzoneInstructions"] > div::before {
+            content: "制限: 5MB/ファイル • PNG, JPG, JPEG";
+            font-size: 12px;
+            color: rgba(49, 51, 63, 0.6);
+            display: block;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Camera Toggle Logic
+    if 'show_camera_loan' not in st.session_state:
+        st.session_state['show_camera_loan'] = False
+
+    # File Uploader (standard with Japanese localization via CSS)
     uploaded_files = st.file_uploader("写真アップロード", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
-    camera_image = st.camera_input("カメラで撮影")
+    
+    # Camera Toggle Button - positioned on the right below the uploader
+    col_spacer, col_cam_btn = st.columns([0.75, 0.25])
+    with col_cam_btn:
+        if st.button("📷 カメラ起動" if not st.session_state['show_camera_loan'] else "❌ 閉じる", key="cam_toggle_loan", use_container_width=True):
+            st.session_state['show_camera_loan'] = not st.session_state['show_camera_loan']
+            st.rerun()
+
+    camera_image = None
+    if st.session_state['show_camera_loan']:
+        st.caption("撮影ボタンを押して写真を記録してください")
+        camera_image = st.camera_input("カメラ", label_visibility="collapsed")
     
     st.subheader("構成品チェック")
     
