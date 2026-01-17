@@ -5,7 +5,9 @@ from src.database import (
     get_all_categories, get_all_users, get_notification_members,
     add_notification_member, remove_notification_member,
     save_system_setting, get_system_setting,
-    get_notification_logs, create_user, delete_user, check_email_exists
+    get_notification_logs, create_user, delete_user, check_email_exists,
+    get_all_departments, create_department, update_department, delete_department,
+    get_users_by_department, update_user_department, get_department_by_id
 )
 
 def render_settings_view():
@@ -14,7 +16,7 @@ def render_settings_view():
     
     st.info("通知グループとSMTP設定、およびユーザーを管理します。")
     
-    tab1, tab2, tab3, tab4 = st.tabs(["📧 SMTP設定", "👤 ユーザー管理", "👥 通知グループ", "📜 通知ログ"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📧 SMTP設定", "🏢 部署管理", "👤 ユーザー管理", "👥 通知グループ", "📜 通知ログ"])
     
     # --- SMTP Configuration ---
     with tab1:
@@ -58,11 +60,6 @@ def render_settings_view():
             if not test_email:
                 st.error("テスト送信先を入力してください。")
             else:
-                # Use current saved settings (or should we use form values? Form values are gone after submit)
-                # We use saved settings for simplicity, forcing user to save first.
-                # Actually, capturing form state is hard without saving.
-                # Let's verify saved settings.
-                
                 saved_config_json = get_system_setting('smtp_config')
                 if not saved_config_json:
                      st.error("設定が保存されていません。先に保存してください。")
@@ -90,11 +87,68 @@ def render_settings_view():
                         st.success(f"送信成功！ ({test_email})")
                     except Exception as e:
                         st.error(f"送信失敗:\n{e}")
+
+    # --- Department Management ---
+    with tab2:
+        st.header("部署管理")
+        st.caption("ユーザーをまとめる部署を管理します。カテゴリの管理部署として使用できます。")
+        
+        # Add Department
+        with st.expander("➕ 新規部署登録", expanded=False):
+            with st.form("create_dept_form"):
+                new_dept_name = st.text_input("部署名")
+                if st.form_submit_button("部署を作成"):
+                    if not new_dept_name:
+                        st.error("部署名を入力してください。")
+                    else:
+                        success, msg = create_department(new_dept_name)
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+        
+        st.divider()
+        
+        # List Departments
+        st.subheader("登録済み部署一覧")
+        departments = get_all_departments()
+        
+        if departments:
+            for dept in departments:
+                users_in_dept = get_users_by_department(dept['id'])
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    c1.markdown(f"**🏢 {dept['name']}**")
+                    c2.caption(f"{len(users_in_dept)} 名")
+                    
+                    # Delete button
+                    if c3.button("削除", key=f"del_dept_{dept['id']}", type="secondary"):
+                        success, msg = delete_department(dept['id'])
+                        if success:
+                            st.success(msg)
+                            st.rerun()
+                        else:
+                            st.error(msg)
+                    
+                    # Show users in this department
+                    if users_in_dept:
+                        with st.expander(f"所属ユーザー ({len(users_in_dept)}名)", expanded=False):
+                            for u in users_in_dept:
+                                role_badge = "👑" if u['role'] == 'admin' else "👤" if u['role'] == 'user' else "🏢"
+                                st.write(f"{role_badge} {u['name']} ({u['email']})")
+        else:
+            st.info("部署が登録されていません。")
                 
     # --- User Management ---
-    with tab2:
+    with tab3:
         st.header("ユーザー管理")
         st.caption("システムにログインできるユーザーを追加・削除します。")
+
+        # Get departments for dropdown
+        departments = get_all_departments()
+        dept_options = {d['name']: d['id'] for d in departments}
+        dept_options_with_none = {"（部署なし）": None, **dept_options}
 
         # 1. Add User
         with st.expander("➕ 新規ユーザー登録", expanded=False):
@@ -104,6 +158,7 @@ def render_settings_view():
                 new_pass = st.text_input("パスワード", type="password")
                 new_pass_confirm = st.text_input("パスワード (確認)", type="password")
                 new_role = st.selectbox("権限", ["user", "admin", "related"], index=0, help="admin: 全権限, user: 一般, related: 関連業者")
+                new_dept = st.selectbox("所属部署", list(dept_options_with_none.keys()), index=0)
                 
                 if st.form_submit_button("ユーザーを作成"):
                     if not new_email or not new_name or not new_pass:
@@ -114,6 +169,11 @@ def render_settings_view():
                         st.error("このメールアドレスは既に使用されています。")
                     else:
                         if create_user(new_email, new_name, new_pass, new_role):
+                            # Get the newly created user and set department
+                            from src.database import get_user_by_email
+                            new_user = get_user_by_email(new_email)
+                            if new_user and dept_options_with_none[new_dept] is not None:
+                                update_user_department(new_user['id'], dept_options_with_none[new_dept])
                             st.success(f"ユーザーを作成しました: {new_name}")
                             st.rerun()
                         else:
@@ -121,31 +181,34 @@ def render_settings_view():
 
         st.divider()
 
-        # 2. List Users
+        # 2. List Users by Department
         st.subheader("登録済みユーザー一覧")
         
-        users = get_all_users()
-        if users:
-            for u in users:
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns([2, 1, 1])
-                    role_badge = "👑 管理者" if u['role'] == 'admin' else "👤 一般" if u['role'] == 'user' else "🏢 関連業者"
-                    c1.markdown(f"**{u['name']}** ({u['email']})")
-                    c2.caption(role_badge)
-                    
-                    # Prevent deleting self or last admin handled in DB, but good to act here too
-                    if c3.button("削除", key=f"del_user_{u['id']}", type="secondary"):
-                        success, msg = delete_user(u['id'])
-                        if success:
-                            st.warning(msg)
-                            st.rerun()
-                        else:
-                            st.error(msg)
-        else:
-            st.info("ユーザーがいません。")
+        # Show users grouped by department
+        for dept in departments:
+            users_in_dept = get_users_by_department(dept['id'])
+            if users_in_dept:
+                with st.expander(f"🏢 {dept['name']} ({len(users_in_dept)}名)", expanded=True):
+                    for u in users_in_dept:
+                        _render_user_row(u, dept_options_with_none)
+        
+        # Show users without department
+        users_no_dept = get_users_by_department(None)
+        if users_no_dept:
+            with st.expander(f"📋 部署未設定 ({len(users_no_dept)}名)", expanded=True):
+                for u in users_no_dept:
+                    _render_user_row(u, dept_options_with_none)
+        
+        if not departments and not users_no_dept:
+            users = get_all_users()
+            if users:
+                for u in users:
+                    _render_user_row(u, dept_options_with_none)
+            else:
+                st.info("ユーザーがいません。")
 
     # --- Notification Groups ---
-    with tab3:
+    with tab4:
         st.header("通知グループ")
         st.caption("カテゴリごとの異常発生時の通知先を設定します。")
         
@@ -172,27 +235,70 @@ def render_settings_view():
                 
                 st.divider()
                 
-                # Add Member
+                # Add Member - Two options: individual or by department
                 st.subheader("メンバー追加")
-                all_users = get_all_users()
-                # Filter out existing members
-                member_ids = [m['id'] for m in members]
-                available_users = [u for u in all_users if u['id'] not in member_ids]
                 
-                if available_users:
-                    u_map = {f"{u['name']} ({u['email']})": u['id'] for u in available_users}
-                    selected_user_label = st.selectbox("ユーザー選択", list(u_map.keys()))
-                    if st.button("追加"):
-                        add_notification_member(cat_id, u_map[selected_user_label])
-                        st.success("メンバーを追加しました。")
-                        st.rerun()
-                else:
-                    st.info("追加可能なユーザーがいません（全員追加済みか、ユーザーマスタが空です）。")
+                add_tab1, add_tab2 = st.tabs(["👤 個別追加", "🏢 部署で追加"])
+                
+                # Tab 1: Individual user addition
+                with add_tab1:
+                    all_users = get_all_users()
+                    # Filter out existing members
+                    member_ids = [m['id'] for m in members]
+                    available_users = [u for u in all_users if u['id'] not in member_ids]
+                    
+                    if available_users:
+                        u_map = {f"{u['name']} ({u['email']})": u['id'] for u in available_users}
+                        selected_user_label = st.selectbox("ユーザー選択", list(u_map.keys()))
+                        if st.button("追加", key="add_user_btn"):
+                            add_notification_member(cat_id, u_map[selected_user_label])
+                            st.success("メンバーを追加しました。")
+                            st.rerun()
+                    else:
+                        st.info("追加可能なユーザーがいません（全員追加済みか、ユーザーマスタが空です）。")
+                
+                # Tab 2: Department-based addition
+                with add_tab2:
+                    departments = get_all_departments()
+                    if departments:
+                        dept_map = {d['name']: d['id'] for d in departments}
+                        selected_dept_name = st.selectbox("部署選択", list(dept_map.keys()), key="dept_select_notif")
+                        
+                        if selected_dept_name:
+                            dept_id = dept_map[selected_dept_name]
+                            dept_users = get_users_by_department(dept_id)
+                            
+                            # Check how many are not already members
+                            member_ids = [m['id'] for m in members]
+                            new_users = [u for u in dept_users if u['id'] not in member_ids]
+                            
+                            if new_users:
+                                st.info(f"「{selected_dept_name}」の {len(new_users)} 名を追加できます。")
+                                
+                                # Show preview of users to be added
+                                with st.expander("追加されるユーザー"):
+                                    for u in new_users:
+                                        st.write(f"👤 {u['name']} ({u['email']})")
+                                
+                                if st.button(f"「{selected_dept_name}」の全員を追加", key="add_dept_btn", type="primary"):
+                                    added_count = 0
+                                    for u in new_users:
+                                        add_notification_member(cat_id, u['id'])
+                                        added_count += 1
+                                    st.success(f"{added_count} 名を追加しました。")
+                                    st.rerun()
+                            else:
+                                if dept_users:
+                                    st.info(f"「{selected_dept_name}」のメンバーは全員追加済みです。")
+                                else:
+                                    st.warning(f"「{selected_dept_name}」にはユーザーが所属していません。")
+                    else:
+                        st.info("部署が登録されていません。設定 → 部署管理 で部署を追加してください。")
         else:
             st.warning("カテゴリが登録されていません。マスタ管理で登録してください。")
 
     # --- Logs ---
-    with tab4:
+    with tab5:
         st.header("通知ログ")
         if st.button("更新"):
             st.rerun()
@@ -207,3 +313,43 @@ def render_settings_view():
                 st.divider()
         else:
             st.write("ログはありません。")
+
+
+def _render_user_row(u, dept_options_with_none):
+    """Render a single user row with department selection and delete button."""
+    with st.container(border=True):
+        c1, c2, c3, c4 = st.columns([2, 1.5, 1, 0.5])
+        role_badge = "👑 管理者" if u['role'] == 'admin' else "👤 一般" if u['role'] == 'user' else "🏢 関連業者"
+        c1.markdown(f"**{u['name']}** ({u['email']})")
+        c2.caption(role_badge)
+        
+        # Department selector
+        current_dept_id = u.get('department_id')
+        dept_names = list(dept_options_with_none.keys())
+        current_idx = 0
+        for i, (name, did) in enumerate(dept_options_with_none.items()):
+            if did == current_dept_id:
+                current_idx = i
+                break
+        
+        new_dept_name = c3.selectbox(
+            "部署",
+            dept_names,
+            index=current_idx,
+            key=f"dept_sel_{u['id']}",
+            label_visibility="collapsed"
+        )
+        new_dept_id = dept_options_with_none[new_dept_name]
+        if new_dept_id != current_dept_id:
+            update_user_department(u['id'], new_dept_id)
+            st.rerun()
+        
+        # Delete button
+        if c4.button("🗑️", key=f"del_user_{u['id']}", help="削除"):
+            from src.database import delete_user
+            success, msg = delete_user(u['id'])
+            if success:
+                st.warning(msg)
+                st.rerun()
+            else:
+                st.error(msg)

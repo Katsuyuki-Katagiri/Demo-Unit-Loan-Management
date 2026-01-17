@@ -227,8 +227,20 @@ def init_db():
         )
     ''')
     
+    # Departments (部署)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS departments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL
+        )
+    ''')
+    
     conn.commit()
     conn.close()
+    
+    # Run migrations
+    migrate_user_department()
+    migrate_category_managing_department()
     
     migrate_dates()
 
@@ -369,6 +381,39 @@ def migrate_category_visibility():
         print(f"Migration error: {e}")
     finally:
         conn.close()
+
+def migrate_user_department():
+    """Migrate users table to include department_id column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(users)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'department_id' not in columns:
+            print("Migrating users: adding department_id column...")
+            c.execute("ALTER TABLE users ADD COLUMN department_id INTEGER REFERENCES departments(id)")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
+def migrate_category_managing_department():
+    """Migrate categories table to include managing_department_id column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(categories)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'managing_department_id' not in columns:
+            print("Migrating categories: adding managing_department_id column...")
+            c.execute("ALTER TABLE categories ADD COLUMN managing_department_id INTEGER REFERENCES departments(id)")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 
 def update_category_visibility(category_id: int, is_visible: bool):
     """Update visibility status of a category."""
@@ -1320,5 +1365,134 @@ def reset_database_keep_admin():
     return True
 
 
+# --- Department Management ---
 
+def create_department(name: str):
+    """Create a new department."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO departments (name) VALUES (?)", (name,))
+        conn.commit()
+        return True, "部署を作成しました"
+    except sqlite3.IntegrityError:
+        return False, "同じ名前の部署が既に存在します"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
 
+def get_all_departments():
+    """Get all departments."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM departments ORDER BY name")
+    res = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return res
+
+def get_department_by_id(department_id: int):
+    """Get a department by ID."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM departments WHERE id = ?", (department_id,))
+    res = c.fetchone()
+    conn.close()
+    return dict(res) if res else None
+
+def update_department(department_id: int, name: str):
+    """Update department name."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE departments SET name = ? WHERE id = ?", (name, department_id))
+        conn.commit()
+        return True, "部署名を更新しました"
+    except sqlite3.IntegrityError:
+        return False, "同じ名前の部署が既に存在します"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def delete_department(department_id: int):
+    """Delete a department if no users belong to it."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        # Check if any users belong to this department
+        c.execute("SELECT count(*) FROM users WHERE department_id = ?", (department_id,))
+        user_count = c.fetchone()[0]
+        if user_count > 0:
+            return False, f"この部署には {user_count} 名のユーザーが所属しているため削除できません"
+        
+        # Check if any categories use this as managing department
+        c.execute("SELECT count(*) FROM categories WHERE managing_department_id = ?", (department_id,))
+        cat_count = c.fetchone()[0]
+        if cat_count > 0:
+            return False, f"この部署は {cat_count} 件のカテゴリの管理部署に設定されているため削除できません"
+        
+        c.execute("DELETE FROM departments WHERE id = ?", (department_id,))
+        conn.commit()
+        return True, "部署を削除しました"
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def update_user_department(user_id: int, department_id: Optional[int]):
+    """Update user's department."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE users SET department_id = ? WHERE id = ?", (department_id, user_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating user department: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_users_by_department(department_id: Optional[int]):
+    """Get users by department. If department_id is None, get users without department."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    if department_id is None:
+        c.execute("SELECT id, name, email, role, department_id FROM users WHERE department_id IS NULL ORDER BY name")
+    else:
+        c.execute("SELECT id, name, email, role, department_id FROM users WHERE department_id = ? ORDER BY name", (department_id,))
+    res = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return res
+
+def update_category_managing_department(category_id: int, department_id: Optional[int]):
+    """Update the managing department of a category."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE categories SET managing_department_id = ? WHERE id = ?", (department_id, category_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating category managing department: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_category_managing_department(category_id: int):
+    """Get the managing department of a category."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT d.* FROM departments d
+        JOIN categories c ON c.managing_department_id = d.id
+        WHERE c.id = ?
+    """, (category_id,))
+    res = c.fetchone()
+    conn.close()
+    return dict(res) if res else None

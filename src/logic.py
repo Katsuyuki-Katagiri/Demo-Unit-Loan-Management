@@ -494,7 +494,7 @@ def process_return(
 
 from src.database import (
     get_notification_members, get_system_setting, log_notification,
-    get_device_unit_by_id, get_device_type_by_id
+    get_device_unit_by_id, get_device_type_by_id, get_category_managing_department
 )
 import smtplib
 import json
@@ -535,7 +535,11 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
         except:
             pass
             
-    # 3. Process Members
+    # 3. Get managing department name
+    managing_dept = get_category_managing_department(category_id)
+    dept_name = managing_dept['name'] if managing_dept else "管理部署"
+    
+    # 4. Process Members
     for m in members:
         recipient_email = m['email']
         recipient_name = m['name']
@@ -557,7 +561,7 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
 ■要対応構成品名: {component_name}
 ■要対応内容: {issue_description}
 
-管理部署に報告お願いします。
+{dept_name}に報告お願いします。
 """)
                 msg['Subject'] = f"[要対応] {type_info['name']} (Lot: {unit['lot_number']})"
                 msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')

@@ -9,7 +9,8 @@ from src.database import (
     create_device_unit, get_device_units, add_unit_override, 
     get_unit_overrides, update_device_unit, UPLOAD_DIR,
     update_item, delete_item, update_device_type_name,
-    delete_device_type
+    delete_device_type, get_all_departments, update_category_managing_department,
+    get_department_by_id
 )
 
 
@@ -27,12 +28,17 @@ def render_master_view():
     # --- Tab 3: Category Visibility ---
     with main_tab3:
         st.header("カテゴリ表示設定")
-        st.caption("ホーム画面に表示する装置カテゴリのON/OFF、名称変更、追加・削除が行えます。")
+        st.caption("ホーム画面に表示する装置カテゴリのON/OFF、名称変更、管理部署設定、追加・削除が行えます。")
         
         from src.database import (
             update_category_visibility, create_category, 
             update_category_name, delete_category
         )
+        
+        # Prepare department options for dropdown
+        departments = get_all_departments()
+        dept_options = {"（未設定）": None}
+        dept_options.update({d['name']: d['id'] for d in departments})
         
         # --- Add New Category ---
         with st.expander("➕ 新しいカテゴリを追加", expanded=False):
@@ -53,46 +59,73 @@ def render_master_view():
         st.divider()
 
         cats = get_all_categories()
-        # cats rows: id, name, is_visible
+        # cats rows: id, name, is_visible, managing_department_id
         
         if cats:
-            for c in cats:
+            for cat in cats:
                 # Default is_visible=1 if None
-                is_vis = bool(c['is_visible']) if 'is_visible' in c.keys() and c['is_visible'] is not None else True
+                is_vis = bool(cat['is_visible']) if 'is_visible' in cat.keys() and cat['is_visible'] is not None else True
                 
-                with st.container():
-                    c1, c2, c3, c4 = st.columns([3, 1.5, 1.5, 0.5])
+                with st.container(border=True):
+                    row1_c1, row1_c2, row1_c3, row1_c4 = st.columns([3, 1.5, 1.5, 0.5])
                     
                     # 1. Edit Name
-                    new_name_input = c1.text_input("名称", value=c['name'], key=f"cat_name_{c['id']}", label_visibility="collapsed")
+                    new_name_input = row1_c1.text_input("名称", value=cat['name'], key=f"cat_name_{cat['id']}", label_visibility="collapsed")
                     
                     # 2. Update Name Button
-                    if c2.button("名称変更", key=f"ren_cat_{c['id']}"):
-                        if new_name_input and new_name_input != c['name']:
-                            if update_category_name(c['id'], new_name_input):
+                    if row1_c2.button("名称変更", key=f"ren_cat_{cat['id']}"):
+                        if new_name_input and new_name_input != cat['name']:
+                            if update_category_name(cat['id'], new_name_input):
                                 st.cache_data.clear()
                                 st.success("変更しました")
                                 st.rerun()
                     
                     # 3. Visibility Toggle
-                    # Use a callback or check change
-                    current_toggle = c3.toggle("表示", value=is_vis, key=f"cat_vis_{c['id']}")
+                    current_toggle = row1_c3.toggle("表示", value=is_vis, key=f"cat_vis_{cat['id']}")
                     if current_toggle != is_vis:
-                         update_category_visibility(c['id'], current_toggle)
+                         update_category_visibility(cat['id'], current_toggle)
                          st.cache_data.clear()
                          st.rerun()
 
                     # 4. Delete Button
-                    if c4.button("🗑️", key=f"del_cat_{c['id']}", help="削除"):
-                         success, msg = delete_category(c['id'])
+                    if row1_c4.button("🗑️", key=f"del_cat_{cat['id']}", help="削除"):
+                         success, msg = delete_category(cat['id'])
                          if success:
                              st.cache_data.clear()
                              st.success(msg)
                              st.rerun()
                          else:
                              st.error(msg)
-                             
-                st.divider()
+                    
+                    # 5. Managing Department Selection (row 2)
+                    current_dept_id = cat.get('managing_department_id')
+                    current_dept_name = "（未設定）"
+                    if current_dept_id:
+                        dept_info = get_department_by_id(current_dept_id)
+                        if dept_info:
+                            current_dept_name = dept_info['name']
+                    
+                    dept_names = list(dept_options.keys())
+                    current_idx = 0
+                    for i, name in enumerate(dept_names):
+                        if name == current_dept_name:
+                            current_idx = i
+                            break
+                    
+                    row2_c1, row2_c2 = st.columns([1, 3])
+                    row2_c1.caption("管理部署:")
+                    new_dept_name = row2_c2.selectbox(
+                        "管理部署",
+                        dept_names,
+                        index=current_idx,
+                        key=f"cat_dept_{cat['id']}",
+                        label_visibility="collapsed"
+                    )
+                    new_dept_id = dept_options[new_dept_name]
+                    if new_dept_id != current_dept_id:
+                        update_category_managing_department(cat['id'], new_dept_id)
+                        st.cache_data.clear()
+                        st.rerun()
         else:
             st.info("カテゴリがありません")
     
