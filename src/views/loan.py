@@ -88,6 +88,23 @@ def render_loan_view(unit_id: int):
     camera_image = None
     if st.session_state['show_camera_loan']:
         st.caption("撮影ボタンを押して写真を記録してください")
+        # Inject JS to prefer rear camera
+        st.markdown("""
+        <script>
+        // Override getUserMedia to prefer rear camera
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+            navigator.mediaDevices.getUserMedia = function(constraints) {
+                if (constraints && constraints.video && typeof constraints.video === 'object') {
+                    constraints.video.facingMode = { ideal: 'environment' };
+                } else if (constraints && constraints.video === true) {
+                    constraints.video = { facingMode: { ideal: 'environment' } };
+                }
+                return originalGetUserMedia(constraints);
+            };
+        }
+        </script>
+        """, unsafe_allow_html=True)
         camera_image = st.camera_input("カメラ", label_visibility="collapsed")
     
     st.subheader("構成品チェック")

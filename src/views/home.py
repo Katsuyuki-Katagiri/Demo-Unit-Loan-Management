@@ -442,20 +442,28 @@ def render_home_view():
             for t in types:
                 # Determine Label with Status
                 units = get_device_units(t['id'])
-                label = t['name']
+                
                 if units:
-                    # Append Lot Number
-                    label += f" (Lot: {units[0]['lot_number']})"
+                    unit = units[0]
+                    status = unit['status']
                     
-                    status = units[0]['status']
+                    # Line 1: Status (first) + Device + Lot
                     if status == 'in_stock':
-                        label += " 【✅ 在庫あり】"
+                        status_badge = "✅ 在庫あり"
                     elif status == 'loaned':
-                        label += " 【🔴 貸出中】"
-                        # Get active loan info
-                        loan_info = get_active_loan(units[0]['id'])
+                        status_badge = "🔴 貸出中"
+                    elif status == 'needs_attention':
+                        status_badge = "⚠️ 要対応"
+                    else:
+                        status_badge = ""
+                    
+                    line1 = f"【{status_badge}】 {t['name']} (Lot: {unit['lot_number']})"
+                    
+                    # Line 2: Loan info (if loaned)
+                    line2 = ""
+                    if status == 'loaned':
+                        loan_info = get_active_loan(unit['id'])
                         if loan_info:
-                            # Get Carrier Name
                             carrier_name = "Unknown"
                             if loan_info['checker_user_id']:
                                 u_obj = get_user_by_id(loan_info['checker_user_id'])
@@ -463,22 +471,29 @@ def render_home_view():
                             else:
                                 sess = get_check_session_by_loan_id(loan_info['id'])
                                 if sess: carrier_name = sess['performed_by']
-
-                            label += f" @ {loan_info['destination']} (持出者: {carrier_name} / {loan_info['checkout_date']})"
+                            
+                            line2 = f"📍 {loan_info['destination']} / 持出者: {carrier_name} / {loan_info['checkout_date']}"
                             if 'notes' in loan_info.keys() and loan_info['notes']:
-                                label += f" [備考: {loan_info['notes']}]"
-                    elif status == 'needs_attention':
-                        label += " 【⚠️ 要対応】"
+                                line2 += f" [備考: {loan_info['notes']}]"
                     
-                    # Maintenance Dates
-                    m_text = ""
-                    if units[0]['last_check_date']:
-                        m_text += f" [点検実施日: {units[0]['last_check_date']}]"
-                    if units[0]['next_check_date']:
-                        m_text += f" [次回: {units[0]['next_check_date']}]"
+                    # Line 3: Maintenance dates
+                    line3 = ""
+                    if unit['last_check_date'] or unit['next_check_date']:
+                        parts = []
+                        if unit['last_check_date']:
+                            parts.append(f"点検: {unit['last_check_date']}")
+                        if unit['next_check_date']:
+                            parts.append(f"次回: {unit['next_check_date']}")
+                        line3 = " | ".join(parts)
                     
-                    if m_text:
-                        label += m_text
+                    # Build multiline label
+                    label = line1
+                    if line2:
+                        label += f"\n{line2}"
+                    if line3:
+                        label += f"\n{line3}"
+                else:
+                    label = t['name']
                 
                 if st.button(label, key=f"type_{t['id']}", use_container_width=True):
                     st.session_state['selected_type_id'] = t['id']
