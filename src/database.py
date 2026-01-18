@@ -1,12 +1,28 @@
-import sqlite3
 import os
-from typing import Optional, List, Tuple, Dict, Any
-import bcrypt
-
 import streamlit as st
 
-DB_PATH = os.path.join("data", "app.db")
-UPLOAD_DIR = os.path.join("data", "uploads")
+# Supabaseが設定されている場合はSupabase版を使用
+_use_supabase = False
+try:
+    supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+    supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+    if supabase_url and supabase_key:
+        _use_supabase = True
+except Exception:
+    pass
+
+if _use_supabase:
+    # Supabase版の全関数をインポート
+    from src.database_supabase import *
+else:
+    # SQLite版を使用
+    import sqlite3
+    from typing import Optional, List, Tuple, Dict, Any
+    import bcrypt
+
+    DB_PATH = os.path.join("data", "app.db")
+    UPLOAD_DIR = os.path.join("data", "uploads")
+
 
 def init_db():
     """Initialize the database with all tables for Phase 1."""
