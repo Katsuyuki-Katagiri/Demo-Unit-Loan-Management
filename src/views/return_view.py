@@ -7,6 +7,13 @@ from src.database import (
 )
 from src.logic import get_synthesized_checklist, process_return, compress_image
 
+# Supabase Storage対応
+try:
+    from src.storage import is_supabase_storage_enabled, upload_session_photo
+    _use_supabase_storage = is_supabase_storage_enabled()
+except ImportError:
+    _use_supabase_storage = False
+
 def render_return_view(unit_id: int):
     # Retrieve Unit & Type Info
     unit = get_device_unit_by_id(unit_id)
@@ -215,20 +222,35 @@ def render_return_view(unit_id: int):
             # 1. Save Photos
             timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             session_dir_name = f"return_{unit_id}_{timestamp_str}"
-            abs_session_dir = os.path.join(UPLOAD_DIR, session_dir_name)
-            os.makedirs(abs_session_dir, exist_ok=True)
             
-            if uploaded_files:
-                for uf in uploaded_files:
-                    compressed = compress_image(uf)
-                    if compressed:
-                        base_name, _ = os.path.splitext(uf.name)
-                        save_name = f"{base_name}.webp"
-                        with open(os.path.join(abs_session_dir, save_name), "wb") as f:
-                            f.write(compressed.getbuffer())
-                    else:
-                        with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                            f.write(uf.getbuffer())
+            # Supabase Storage対応: 一時的にセッションIDとして使用
+            temp_session_id = f"{unit_id}_{timestamp_str}"
+            
+            if _use_supabase_storage:
+                # Supabase Storageにアップロード
+                if uploaded_files:
+                    for i, uf in enumerate(uploaded_files):
+                        compressed = compress_image(uf)
+                        if compressed:
+                            upload_session_photo(temp_session_id, compressed.getbuffer(), i, "webp")
+                        else:
+                            upload_session_photo(temp_session_id, uf.getbuffer(), i, "webp")
+            else:
+                # ローカルファイルシステムにフォールバック
+                abs_session_dir = os.path.join(UPLOAD_DIR, session_dir_name)
+                os.makedirs(abs_session_dir, exist_ok=True)
+                
+                if uploaded_files:
+                    for i, uf in enumerate(uploaded_files):
+                        compressed = compress_image(uf)
+                        if compressed:
+                            base_name, _ = os.path.splitext(uf.name)
+                            save_name = f"{base_name}.webp"
+                            with open(os.path.join(abs_session_dir, save_name), "wb") as f:
+                                f.write(compressed.getbuffer())
+                        else:
+                            with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
+                                f.write(uf.getbuffer())
             
 
             # 2. Build Check Results List
