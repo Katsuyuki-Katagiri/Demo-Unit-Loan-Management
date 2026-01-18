@@ -236,12 +236,20 @@ def apply_custom_css():
         </style>
     """, unsafe_allow_html=True)
     
-    # Scroll to top using components.html (more reliable JS execution)
+    # Scroll to top using components.html with delay for page render
     import streamlit.components.v1 as components
     components.html(
         """
         <script>
-            window.parent.document.querySelector('section.main').scrollTo(0, 0);
+            // Delayed execution to ensure page is fully rendered
+            setTimeout(function() {
+                // Try multiple scroll targets
+                window.parent.scrollTo(0, 0);
+                var mainSection = window.parent.document.querySelector('section.main');
+                if (mainSection) mainSection.scrollTo(0, 0);
+                var appViewContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+                if (appViewContainer) appViewContainer.scrollTo(0, 0);
+            }, 100);
         </script>
         """,
         height=0,
