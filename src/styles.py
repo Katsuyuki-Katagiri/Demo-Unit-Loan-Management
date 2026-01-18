@@ -156,60 +156,81 @@ def apply_custom_css():
         
         /* === Mobile Responsive Styles === */
         @media screen and (max-width: 768px) {
-            /* Smaller headings on mobile */
+            /* Slightly smaller headings on mobile (adjusted from too small) */
             h1 {
-                font-size: 1.4rem !important;
+                font-size: 1.5rem !important;
             }
             h2 {
-                font-size: 1.2rem !important;
+                font-size: 1.3rem !important;
             }
             h3 {
-                font-size: 1.0rem !important;
+                font-size: 1.1rem !important;
             }
             
             /* Smaller header icon on mobile */
             .header-icon {
-                font-size: 24px !important;
+                font-size: 26px !important;
             }
             
-            /* Smaller title text */
+            /* Title text */
             [data-testid="stAppViewContainer"] h1 {
-                font-size: 1.3rem !important;
+                font-size: 1.4rem !important;
                 line-height: 1.3;
             }
             
-            /* Adjust metric cards for mobile */
+            /* Compact metric cards for mobile */
+            div[data-testid="stMetric"] {
+                min-height: 50px !important;
+                padding: 6px 8px !important;
+                margin-top: 5px !important;
+            }
+            div[data-testid="stMetric"] label {
+                font-size: 0.7rem !important;
+                margin-bottom: 2px !important;
+            }
             div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-                font-size: 1.5em !important;
+                font-size: 1.2em !important;
             }
             
-            /* Smaller button text */
+            /* Button text */
             div.stButton > button {
-                font-size: 0.85rem !important;
-                padding: 0.4rem 0.8rem !important;
+                font-size: 0.9rem !important;
+                padding: 0.5rem 0.8rem !important;
             }
             
             /* Compact expander headers */
             div[data-testid="stExpander"] summary {
-                font-size: 0.9rem !important;
+                font-size: 0.95rem !important;
             }
             
-            /* General text size reduction */
-            p, span, label, div {
-                font-size: 0.9rem;
+            /* Reduce column gap for metric columns */
+            [data-testid="stHorizontalBlock"] {
+                gap: 0.3rem !important;
             }
         }
         
         /* Extra small screens (phones in portrait) */
         @media screen and (max-width: 480px) {
             h1 {
-                font-size: 1.2rem !important;
+                font-size: 1.3rem !important;
             }
             h2 {
-                font-size: 1.0rem !important;
+                font-size: 1.1rem !important;
             }
             .header-icon {
-                font-size: 20px !important;
+                font-size: 22px !important;
+            }
+            
+            /* Even more compact metrics on very small screens */
+            div[data-testid="stMetric"] {
+                min-height: 45px !important;
+                padding: 4px 6px !important;
+            }
+            div[data-testid="stMetric"] label {
+                font-size: 0.65rem !important;
+            }
+            div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
+                font-size: 1.0em !important;
             }
         }
         </style>
