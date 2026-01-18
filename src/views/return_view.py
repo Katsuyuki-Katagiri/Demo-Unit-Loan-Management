@@ -192,8 +192,8 @@ def render_return_view(unit_id: int):
     if not confirmation_checked:
         errors.append("医療機器の貸出しに関する確認書のアップロード確認を行ってください")
 
-    if not uploaded_files and not camera_image:
-        errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
+    if not uploaded_files:
+        errors.append("写真を最低1枚保存してください")
         
     if errors:
         for e in errors:
@@ -233,15 +233,7 @@ def render_return_view(unit_id: int):
                         with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
                             f.write(uf.getbuffer())
             
-            if camera_image:
-                compressed_cam = compress_image(camera_image)
-                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.webp"
-                with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
-                    if compressed_cam:
-                        f.write(compressed_cam.getbuffer())
-                    else:
-                        f.write(camera_image.getbuffer())
-                    
+
             # 2. Build Check Results List
             check_results_list = []
             for item in checklist_items:
