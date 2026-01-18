@@ -1033,12 +1033,29 @@ def migrate_returns_notes():
     finally:
         conn.close()
 
+def migrate_returns_confirmation_check():
+    """Migrate returns table to include confirmation_checked column."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(returns)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'confirmation_checked' not in columns:
+            print("Migrating returns: adding confirmation_checked column...")
+            c.execute("ALTER TABLE returns ADD COLUMN confirmation_checked INTEGER DEFAULT 0")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
 def create_return(
     loan_id: int,
     return_date: str,
     checker_user_id: Optional[int] = None,
     assetment_returned: bool = False,
-    notes: str = None
+    notes: str = None,
+    confirmation_checked: bool = False
 ) -> int:
     # マイグレーションはapp.py起動時に実行されるため、ここでは不要
     
@@ -1047,9 +1064,9 @@ def create_return(
     
     # 1. Create Return Record
     c.execute("""
-        INSERT INTO returns (loan_id, return_date, checker_user_id, assetment_returned, notes)
-        VALUES (?, ?, ?, ?, ?)
-    """, (loan_id, return_date, checker_user_id, 1 if assetment_returned else 0, notes))
+        INSERT INTO returns (loan_id, return_date, checker_user_id, assetment_returned, notes, confirmation_checked)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (loan_id, return_date, checker_user_id, 1 if assetment_returned else 0, notes, 1 if confirmation_checked else 0))
     return_id = c.lastrowid
     
     # 2. Close the Loan
@@ -1217,6 +1234,7 @@ def migrate_phase4():
 def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
     # Ensure schema is up to date (needed for new Assetment columns if not yet run)
     migrate_returns_assetment_check()
+    migrate_returns_confirmation_check()
     
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -1224,7 +1242,7 @@ def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, in
     
     # Left join to get return info if available (get the latest valid return)
     query = """
-        SELECT l.*, r.assetment_returned
+        SELECT l.*, r.assetment_returned, r.confirmation_checked
         FROM loans l
         LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
         WHERE l.device_unit_id = ?

@@ -24,12 +24,20 @@ def render_home_view():
             if st.button("← 機種一覧に戻る"): 
                 st.session_state['selected_unit_id'] = None
                 st.session_state['selected_type_id'] = None # Also clear type to go back to list
+                st.session_state['loan_mode'] = False
+                st.session_state['return_mode'] = False
+                if 'checklist_data' in st.session_state: del st.session_state['checklist_data']
+                if 'return_checklist_data' in st.session_state: del st.session_state['return_checklist_data']
                 st.rerun()
         with c_b2:
             if st.button("🏠 ホームに戻る", key="home_btn_3"):
                 st.session_state['selected_unit_id'] = None
                 st.session_state['selected_type_id'] = None
                 st.session_state['selected_category_id'] = None
+                st.session_state['loan_mode'] = False
+                st.session_state['return_mode'] = False
+                if 'checklist_data' in st.session_state: del st.session_state['checklist_data']
+                if 'return_checklist_data' in st.session_state: del st.session_state['return_checklist_data']
                 st.rerun()
             
     elif 'selected_type_id' in st.session_state and st.session_state['selected_type_id']:
@@ -95,7 +103,14 @@ def render_home_view():
                     
                     loaner_disp = f" | 持出者: {l_Name}"
 
-            st.info(f"{location_disp}{loaner_disp} | Status: {unit['status']}")
+            # Status Mapping
+            status_map = {
+                'in_stock': '在庫あり',
+                'loaned': '貸出中',
+                'needs_attention': '要対応'
+            }
+            status_jp = status_map.get(unit['status'], unit['status'])
+            st.info(f"{location_disp}{loaner_disp} | ステータス: {status_jp}")
             
             # --- Issues Section ---
             from src.database import get_open_issues
@@ -132,7 +147,8 @@ def render_home_view():
                 if not displayed_history:
                     st.write("履歴なし")
                 else:
-                    for l in displayed_history:
+                    for l_row in displayed_history:
+                        l = dict(l_row)
                         status_icon = "🟢" if l['status'] == 'open' else "⚫"
                         
                         # Determine Carrier Name
@@ -146,8 +162,17 @@ def render_home_view():
                             if sess: carrier_name = sess['performed_by']
 
                         st.markdown(f"**{l['checkout_date']}** - {l['destination']} ({l['purpose']})")
-                        assetment_label = "Assetment登録: 済" if 'assetment_checked' in l.keys() and l['assetment_checked'] else "Assetment登録: 未"
-                        st.caption(f"Status: {l['status']} | 持出者: {carrier_name} | {status_icon} | {assetment_label}")
+                        if l['status'] == 'open':
+                            assetment_label = "Assetment: 済" if 'assetment_checked' in l.keys() and l['assetment_checked'] else "Assetment: 未"
+                        else: # Closed (Returned)
+                            labels = []
+                            if l.get('assetment_checked'): labels.append("貸出Assetment: 済")
+                            if l.get('assetment_returned'): labels.append("返却Assetment: 済")
+                            if l.get('confirmation_checked'): labels.append("確認書: 済")
+                            assetment_label = " | ".join(labels) if labels else "Assetment: 未"
+                        
+                        status_disp = "貸出中" if l['status'] == 'open' else "返却済"
+                        st.caption(f"ステータス: {status_disp} | 持出者: {carrier_name} | {status_icon} | {assetment_label}")
                         
                         if 'notes' in l.keys() and l['notes']:
                             st.info(f"備考: {l['notes']}")
@@ -209,9 +234,9 @@ def render_home_view():
                                             
                                             st.write(f"{r_icon} **{line['item_name']}**")
                                             if line['result'] != 'OK':
-                                                st.caption(f"Reason: {line['ng_reason']} | Found: {line['found_qty']}")
+                                                st.caption(f"理由: {line['ng_reason']} | 数量: {line['found_qty']}")
                                             if line['comment']:
-                                                st.caption(f"Comment: {line['comment']}")
+                                                st.caption(f"コメント: {line['comment']}")
                         
                         # Stronger Divider
                         st.markdown("<hr style='border: none; border-top: 3px solid #666; margin: 30px 0;'>", unsafe_allow_html=True)

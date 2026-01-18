@@ -33,10 +33,6 @@ def render_return_view(unit_id: int):
     st.markdown(f"**{type_info['name']}** (Lot: {unit['lot_number']})")
     
     # Back Button
-    if st.button("← キャンセルして戻る"):
-        st.session_state['return_mode'] = False
-        st.rerun()
-
     st.divider()
 
     # --- Display Loan Info ---
@@ -191,6 +187,11 @@ def render_return_view(unit_id: int):
     if not assetment_returned:
         st.info("💡 返却登録が済んでいない場合は [https://saas.assetment.net/AS3230-PA0200320/](https://saas.assetment.net/AS3230-PA0200320/) から返却登録を行ってから返却を確定してください")
 
+    st.write("")
+    confirmation_checked = st.checkbox("医療機器の貸出しに関する確認書をアップロードお願いします", key="check_confirmation_ret")
+    if not confirmation_checked:
+        st.info("💡 確認書をアップロードしていない場合は [こちら](https://forms.office.com/pages/responsepage.aspx?id=wfeBD9KOc0CWX5TRWC9tQ5z80pIW4x5CmSR6SYfwmBJUQlBFQ0dNRzRXUU5ZQ1BBMVZKVjJMOTgxVyQlQCN0PWcu&route=shorturl) からアップロードをお願いします")
+
     st.divider()
     st.markdown("### 備考（任意）")
     remarks = st.text_area("自由に記載できます", placeholder="例：付属品の欠品あり、異音ありなど", key="return_remarks")
@@ -203,6 +204,8 @@ def render_return_view(unit_id: int):
         errors.append("「汚れはありませんか」のチェックを確認してください")
     if not assetment_returned:
         errors.append("AssetmentNeoの返却処理確認を行ってください")
+    if not confirmation_checked:
+        errors.append("医療機器の貸出しに関する確認書のアップロード確認を行ってください")
 
     if not uploaded_files and not camera_image:
         errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
@@ -301,7 +304,8 @@ def render_return_view(unit_id: int):
                     user_name=user_name,
                     user_id=st.session_state.get('user_id'),
                     assetment_returned=assetment_returned,
-                    notes=remarks
+                    notes=remarks,
+                    confirmation_checked=confirmation_checked
                 )
                 
                 if result_status == 'in_stock':

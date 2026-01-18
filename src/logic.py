@@ -197,7 +197,7 @@ def process_loan(
             # Create Issue
             summary = f"NG Item: {res['name']} - {res.get('ng_reason')}"
             issue_id = create_issue(device_unit_id, session_id, summary, user_name)
-            trigger_issue_notification(device_unit_id, issue_id, res['name'], res.get('ng_reason'))
+            trigger_issue_notification(device_unit_id, issue_id, res['name'], res.get('ng_reason'), user_name, res.get('comment'))
             
     # 5. Update Status
     # Notify User + Group
@@ -372,7 +372,8 @@ def process_return(
     user_id: int = None,
     user_name: str = "Unknown",
     assetment_returned: bool = False,
-    notes: str = None
+    notes: str = None,
+    confirmation_checked: bool = False
 ):
     """
     Process a return request.
@@ -396,7 +397,8 @@ def process_return(
         return_date=return_date,
         checker_user_id=user_id,
         assetment_returned=assetment_returned,
-        notes=notes
+        notes=notes,
+        confirmation_checked=confirmation_checked
     )
     
     # 3. Create Check Session
@@ -430,7 +432,7 @@ def process_return(
             # Create Issue
             summary = f"[Return] NG Item: {res['name']} - {res.get('ng_reason')}"
             issue_id = create_issue(device_unit_id, session_id, summary, user_name)
-            trigger_issue_notification(device_unit_id, issue_id, res['name'], res.get('ng_reason'))
+            trigger_issue_notification(device_unit_id, issue_id, res['name'], res.get('ng_reason'), user_name, res.get('comment'))
             
     # Notify User + Group
     # Get Unit info for email
@@ -501,14 +503,14 @@ import json
 import threading
 from email.mime.text import MIMEText
 
-def trigger_issue_notification(device_unit_id: int, issue_id: int, component_name: str, issue_description: str):
+def trigger_issue_notification(device_unit_id: int, issue_id: int, component_name: str, issue_description: str, reporter_name: str = "Unknown", comment: str = None):
     """
     Wrapper to trigger notification in background thread.
     """
-    t = threading.Thread(target=_blocking_issue_notification, args=(device_unit_id, issue_id, component_name, issue_description))
+    t = threading.Thread(target=_blocking_issue_notification, args=(device_unit_id, issue_id, component_name, issue_description, reporter_name, comment))
     t.start()
 
-def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_name: str, issue_description: str):
+def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_name: str, issue_description: str, reporter_name: str, comment: str):
     """
     Actual notification logic (runs in thread).
     1. Identify Category -> Group Members
@@ -551,6 +553,7 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
         if smtp_enabled and recipient_email:
             try:
                 # Send Email
+                comment_disp = comment if comment else "なし"
                 msg = MIMEText(f"""
 {recipient_name} 様
 
@@ -558,8 +561,10 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
 
 ■装置名: {type_info['name']}
 ■ロット: {unit['lot_number']}
+■報告者: {reporter_name}
 ■要対応構成品名: {component_name}
 ■要対応内容: {issue_description}
+■コメント: {comment_disp}
 
 {dept_name}に報告お願いします。
 """)

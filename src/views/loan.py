@@ -26,10 +26,6 @@ def render_loan_view(unit_id: int):
     st.markdown(f"**{type_info['name']}** (Lot: {unit['lot_number']})")
     
     # Back Button
-    if st.button("← キャンセルして戻る"):
-        st.session_state['loan_mode'] = False
-        st.rerun()
-
     st.divider()
 
     # --- input Fields ---
@@ -95,6 +91,7 @@ def render_loan_view(unit_id: int):
         camera_image = st.camera_input("カメラ", label_visibility="collapsed")
     
     st.subheader("構成品チェック")
+    st.caption("構成品が揃っているか確認お願いします。紛失・破損がある場合はNGにチェックして下さい")
     
     # helper for session state initialization
     if 'checklist_data' not in st.session_state or st.session_state.get('current_loan_unit_id') != unit_id:
