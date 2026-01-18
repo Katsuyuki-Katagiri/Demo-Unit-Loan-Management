@@ -71,25 +71,9 @@ def render_loan_view(unit_id: int):
     </style>
     """, unsafe_allow_html=True)
 
-    # Camera Toggle Logic
-    if 'show_camera_loan' not in st.session_state:
-        st.session_state['show_camera_loan'] = False
-
     # File Uploader (standard with Japanese localization via CSS)
     uploaded_files = st.file_uploader("写真アップロード", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'])
-    
-    # Camera Toggle Button - positioned on the right below the uploader
-    col_spacer, col_cam_btn = st.columns([0.75, 0.25])
-    with col_cam_btn:
-        if st.button("📷 カメラ起動" if not st.session_state['show_camera_loan'] else "❌ 閉じる", key="cam_toggle_loan", use_container_width=True):
-            st.session_state['show_camera_loan'] = not st.session_state['show_camera_loan']
-            st.rerun()
-
-    camera_image = None
-    if st.session_state['show_camera_loan']:
-        st.caption("📷 撮影ボタンを押して写真を記録してください")
-        st.caption("💡 ヒント: 背面カメラを使いたい場合は、上のファイル選択から「写真を撮る」を選んでください")
-        camera_image = st.camera_input("カメラ", label_visibility="collapsed")
+    st.caption("📷 スマホの場合: 「Browse files」→「写真を撮る」または「カメラ」で背面カメラから撮影できます")
     
     st.subheader("構成品チェック")
     st.caption("構成品が揃っているか確認お願いします。紛失・破損がある場合はNGにチェックして下さい")
@@ -192,8 +176,8 @@ def render_loan_view(unit_id: int):
     errors = []
     if not destination:
         errors.append("貸出先を入力してください")
-    if not uploaded_files and not camera_image:
-        errors.append("写真を最低1枚保存してください（アップロード または カメラ撮影）")
+    if not uploaded_files:
+        errors.append("写真を最低1枚保存してください")
     if not assetment_checked:
         errors.append("AssetmentNeoの登録確認を行ってください")
         
@@ -230,17 +214,7 @@ def render_loan_view(unit_id: int):
                         with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
                             f.write(uf.getvalue())
             
-            if camera_image:
-                # Compress camera image too
-                compressed_cam = compress_image(camera_image)
-                cam_filename = f"camera_{datetime.datetime.now().strftime('%H%M%S')}.webp"
-                
-                with open(os.path.join(abs_session_dir, cam_filename), "wb") as f:
-                    if compressed_cam:
-                        f.write(compressed_cam.getvalue())
-                    else:
-                        f.write(camera_image.getvalue())
-                    
+
             # 2. Build Check Results List
             check_results_list = []
             for item in checklist_items:

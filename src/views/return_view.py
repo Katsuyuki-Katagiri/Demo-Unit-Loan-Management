@@ -87,25 +87,9 @@ def render_return_view(unit_id: int):
     </style>
     """, unsafe_allow_html=True)
     
-    # Camera Toggle Logic
-    if 'show_camera_return' not in st.session_state:
-        st.session_state['show_camera_return'] = False
-
     # File Uploader (standard with Japanese localization via CSS)
     uploaded_files = st.file_uploader("写真アップロード", accept_multiple_files=True, type=['png', 'jpg', 'jpeg'], key="return_uploader")
-    
-    # Camera Toggle Button - positioned on the right below the uploader
-    col_spacer, col_cam_btn = st.columns([0.75, 0.25])
-    with col_cam_btn:
-        if st.button("📷 カメラ起動" if not st.session_state['show_camera_return'] else "❌ 閉じる", key="cam_toggle_return", use_container_width=True):
-            st.session_state['show_camera_return'] = not st.session_state['show_camera_return']
-            st.rerun()
-
-    camera_image = None
-    if st.session_state['show_camera_return']:
-        st.caption("📷 撮影ボタンを押して写真を記録してください")
-        st.caption("💡 ヒント: 背面カメラを使いたい場合は、上のファイル選択から「写真を撮る」を選んでください")
-        camera_image = st.camera_input("カメラ", key="return_camera", label_visibility="collapsed")
+    st.caption("📷 スマホの場合: 「Browse files」→「写真を撮る」または「カメラ」で背面カメラから撮影できます")
     
     st.subheader("構成品チェック")
     
