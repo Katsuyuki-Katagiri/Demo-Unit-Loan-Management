@@ -29,6 +29,9 @@ def get_client() -> Client:
 
 # アップロードディレクトリ（写真用）
 UPLOAD_DIR = os.path.join("data", "uploads")
+# SQLite互換性のためのダミーパス（Supabase使用時は実際には使用されない）
+DB_PATH = os.path.join("data", "app.db")
+
 
 def init_db():
     """データベース初期化（Supabaseでは主にディレクトリ作成のみ）"""
