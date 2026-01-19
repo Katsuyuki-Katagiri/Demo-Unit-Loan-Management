@@ -438,7 +438,7 @@ def delete_device_unit(unit_id: int):
 
 # --- Loans ---
 
-def create_loan(device_unit_id: int, checkout_date: str, destination: str, purpose: str, checker_user_id: int = None, notes: str = ""):
+def create_loan(device_unit_id: int, checkout_date: str, destination: str, purpose: str, checker_user_id: int = None, notes: str = "", assetment_checked: bool = False):
     """貸出を作成"""
     client = get_client()
     result = client.table("loans").insert({
@@ -448,6 +448,7 @@ def create_loan(device_unit_id: int, checkout_date: str, destination: str, purpo
         "purpose": purpose,
         "checker_user_id": checker_user_id,
         "notes": notes,
+        "assetment_checked": assetment_checked,
         "status": "open"
     }).execute()
     if result.data:
