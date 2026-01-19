@@ -225,7 +225,7 @@ def process_loan(
 """
     # 操作者本人への通知
     if user_id:
-        trigger_user_notification(user_id, f"[貸出完了] {device_name} (Lot: {lot_number})", email_body, 'loan_confirmation', loan_id)
+        trigger_user_notification(user_id, f"【デモ機管理アプリ報告】[貸出完了] {device_name} (Lot: {lot_number})", email_body, 'loan_confirmation', loan_id)
     
     # 通知グループへの通知（グループメンバー全員）
     group_email_body = f"""
@@ -242,7 +242,7 @@ def process_loan(
 
 {status_msg}
 """
-    trigger_group_notification(device_unit_id, f"[貸出通知] {device_name} (Lot: {lot_number})", group_email_body, 'loan_group_notification', loan_id)
+    trigger_group_notification(device_unit_id, f"【デモ機管理アプリ報告】[貸出通知] {device_name} (Lot: {lot_number})", group_email_body, 'loan_group_notification', loan_id)
 
     if has_ng:
         update_unit_status(device_unit_id, 'needs_attention')
@@ -461,7 +461,7 @@ def process_return(
 """
     # 操作者本人への通知
     if user_id:
-        trigger_user_notification(user_id, f"[返却完了] {device_name} (Lot: {lot_number})", email_body, 'return_confirmation', loan_id)
+        trigger_user_notification(user_id, f"【デモ機管理アプリ報告】[返却完了] {device_name} (Lot: {lot_number})", email_body, 'return_confirmation', loan_id)
     
     # 通知グループへの通知（グループメンバー全員）
     group_email_body = f"""
@@ -478,7 +478,7 @@ def process_return(
 
 {status_msg}
 """
-    trigger_group_notification(device_unit_id, f"[返却通知] {device_name} (Lot: {lot_number})", group_email_body, 'return_group_notification', loan_id)
+    trigger_group_notification(device_unit_id, f"【デモ機管理アプリ報告】[返却通知] {device_name} (Lot: {lot_number})", group_email_body, 'return_group_notification', loan_id)
 
     # 5. Update Status (Recalculate)
     # Check if ANY open issues exist (from this return OR previous)
@@ -568,7 +568,7 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
 
 {dept_name}に報告お願いします。
 """)
-                msg['Subject'] = f"[要対応] {type_info['name']} (Lot: {unit['lot_number']})"
+                msg['Subject'] = f"【デモ機管理アプリ報告】[要対応] {type_info['name']} (Lot: {unit['lot_number']})"
                 msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
                 msg['To'] = recipient_email
                 

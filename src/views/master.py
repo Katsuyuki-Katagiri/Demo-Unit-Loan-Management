@@ -390,7 +390,8 @@ def render_master_view():
                                 st.error("ファイルサイズが大きすぎます (上限5MB)")
                                 return
 
-                            compressed = compress_image(uploaded_file)
+                            # 構成品マスタ用：より強い圧縮（最大400x400, 品質40）
+                            compressed = compress_image(uploaded_file, max_size=(400, 400), quality=40)
                             if compressed:
                                 base, _ = os.path.splitext(uploaded_file.name)
                                 save_name = f"{base}.webp"
@@ -440,7 +441,8 @@ def render_master_view():
                         if c_upd.form_submit_button("更新"):
                             photo_path = ""
                             if new_file:
-                                compressed = compress_image(new_file)
+                                # 構成品マスタ用：より強い圧縮（最大400x400, 品質40）
+                                compressed = compress_image(new_file, max_size=(400, 400), quality=40)
                                 if compressed:
                                     base, _ = os.path.splitext(new_file.name)
                                     save_name = f"{base}.jpg"
