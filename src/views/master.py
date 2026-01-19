@@ -472,12 +472,16 @@ def render_master_view():
     
     # --- Tab 3: Data Management (Admin Only) ---
     current_user_email = st.session_state.get('user_email', '')
+    current_user_role = st.session_state.get('user_role', '')
     
     st.divider()
-    st.caption(f" Debug Info: 現在のログインユーザー = '{current_user_email}'")
+    st.caption(f" Debug Info: 現在のログインユーザー = '{current_user_email}' (権限: '{current_user_role}')")
     
-    # Add tab if admin
-    if current_user_email == 'admin@example.com':
+    # Add tab if admin role or admin@example.com (case-insensitive check)
+    is_admin = (current_user_role.lower() == 'admin' if current_user_role else False) or current_user_email == 'admin@example.com'
+    st.caption(f" Debug: is_admin = {is_admin}, role.lower() = '{current_user_role.lower() if current_user_role else ''}')")
+    
+    if is_admin:
         # Re-create tabs to include Data Management
         # Note: Streamlit tabs must be defined at once.
         # Since we defined tabs at the top, we can't easily add one here without restructuring.
@@ -494,11 +498,11 @@ def render_master_view():
                 以下のデータを**全て削除**し、システムを初期状態に戻します。
                 - 全ての機材・構成品登録
                 - 全ての貸出・返却・点検記録
-                - `admin@example.com` 以外の全ユーザー
+                - admin権限以外の全ユーザー
                 - アップロードされた全画像ファイル
                 
                 ※カテゴリー情報は初期値にリセットされます。
-                ※**この管理者アカウント (admin@example.com) は削除されません。**
+                ※**admin権限ユーザーは削除されません。**
             """)
             
             confirm_reset = st.checkbox("上記を確認し、本当にデータを削除することに同意します (I agree to wipe all data)")
@@ -514,4 +518,4 @@ def render_master_view():
                     else:
                         st.error("初期化に失敗しました。")
     else:
-        st.warning("⚠️ データ初期化機能は `admin@example.com` アカウントでのみ表示されます。")
+        st.warning("⚠️ データ初期化機能は管理者権限（admin）を持つユーザーのみ表示されます。")

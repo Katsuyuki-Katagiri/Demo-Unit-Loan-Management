@@ -1032,7 +1032,7 @@ def get_users_by_department(department_id: int = None):
 def get_notification_logs(limit: int = 50):
     """通知ログを取得"""
     client = get_client()
-    result = client.table("notification_logs").select("*").order("sent_at", desc=True).limit(limit).execute()
+    result = client.table("notification_logs").select("*").order("created_at", desc=True).limit(limit).execute()
     return result.data
 
 def save_system_setting(key: str, value: str):
