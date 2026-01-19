@@ -173,8 +173,8 @@ def render_return_view(unit_id: int):
     
     st.write("")
     assetment_returned = st.checkbox("AssetmentNeoの返却処理を忘れずに行って下さい", key="check_assetment_ret")
-    if not assetment_returned:
-        st.info("💡 返却登録が済んでいない場合は [https://saas.assetment.net/AS3230-PA0200320/](https://saas.assetment.net/AS3230-PA0200320/) から返却登録を行ってから返却を確定してください")
+
+
 
     st.write("")
     confirmation_checked = st.checkbox("医療機器の貸出しに関する確認書をアップロードお願いします", key="check_confirmation_ret")
