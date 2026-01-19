@@ -1120,3 +1120,33 @@ def migrate_returns_notes():
 
 def migrate_returns_confirmation_check():
     pass
+
+# --- Login History ---
+
+def record_login_history(user_id: int, email: str, user_name: str, ip_address: str = None, user_agent: str = None, success: bool = True):
+    """ログイン履歴を記録"""
+    client = get_client()
+    try:
+        client.table("login_history").insert({
+            "user_id": user_id,
+            "email": email,
+            "user_name": user_name,
+            "ip_address": ip_address,
+            "user_agent": user_agent,
+            "success": success
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"Login history record error: {e}")
+        return False
+
+def get_login_history(user_id: int = None, limit: int = 100):
+    """ログイン履歴を取得"""
+    client = get_client()
+    query = client.table("login_history").select("*")
+    
+    if user_id:
+        query = query.eq("user_id", user_id)
+    
+    result = query.order("login_at", desc=True).limit(limit).execute()
+    return result.data

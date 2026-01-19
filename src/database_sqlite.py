@@ -251,6 +251,21 @@ def init_db():
         )
     ''')
     
+    # Login History (ログイン履歴)
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS login_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            email TEXT NOT NULL,
+            user_name TEXT,
+            login_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            ip_address TEXT,
+            user_agent TEXT,
+            success INTEGER DEFAULT 1,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
     conn.commit()
     conn.close()
     
@@ -261,6 +276,46 @@ def init_db():
     migrate_category_sort_order()
     
     migrate_dates()
+
+# --- Login History ---
+
+def record_login_history(user_id: int, email: str, user_name: str, ip_address: str = None, user_agent: str = None, success: bool = True):
+    """ログイン履歴を記録"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute('''
+            INSERT INTO login_history (user_id, email, user_name, ip_address, user_agent, success)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, email, user_name, ip_address, user_agent, 1 if success else 0))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Login history record error: {e}")
+        return False
+    finally:
+        conn.close()
+
+def get_login_history(user_id: int = None, limit: int = 100):
+    """ログイン履歴を取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute('''
+            SELECT * FROM login_history WHERE user_id = ?
+            ORDER BY login_at DESC LIMIT ?
+        ''', (user_id, limit))
+    else:
+        c.execute('''
+            SELECT * FROM login_history
+            ORDER BY login_at DESC LIMIT ?
+        ''', (limit,))
+    
+    results = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return results
 
 # --- User & Auth ---
 

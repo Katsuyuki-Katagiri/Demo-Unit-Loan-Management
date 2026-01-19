@@ -31,6 +31,20 @@ def login_user(email: str, password: str) -> bool:
         st.session_state['user_email'] = user['email'] # Fixed: Save email to session
         st.session_state['user_role'] = user['role']
         st.session_state['logged_in'] = True
+        
+        # ログイン履歴を記録
+        try:
+            from src.database import record_login_history
+            record_login_history(
+                user_id=user['id'],
+                email=user['email'],
+                user_name=user['name'],
+                success=True
+            )
+        except Exception as e:
+            # ログイン履歴の記録に失敗してもログイン自体は成功させる
+            print(f"Failed to record login history: {e}")
+        
         return True
     
     return False

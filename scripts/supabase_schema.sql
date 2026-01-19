@@ -173,6 +173,18 @@ CREATE TABLE IF NOT EXISTS system_settings (
     value TEXT
 );
 
+-- 17. Login History テーブル（ログイン履歴）
+CREATE TABLE IF NOT EXISTS login_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    email TEXT NOT NULL,
+    user_name TEXT,
+    login_at TIMESTAMP DEFAULT NOW(),
+    ip_address TEXT,
+    user_agent TEXT,
+    success BOOLEAN DEFAULT true
+);
+
 -- Row Level Security (RLS) を無効化（シンプルな運用のため）
 -- 本番環境ではセキュリティ要件に応じてRLSを有効化してください
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -191,6 +203,7 @@ ALTER TABLE departments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_groups ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE login_history ENABLE ROW LEVEL SECURITY;
 
 -- 全テーブルにアクセス許可ポリシーを追加
 -- service_role キーを使用するため、全てのアクセスを許可
@@ -210,3 +223,4 @@ CREATE POLICY "Allow all for service role" ON departments FOR ALL USING (true);
 CREATE POLICY "Allow all for service role" ON notification_groups FOR ALL USING (true);
 CREATE POLICY "Allow all for service role" ON notification_logs FOR ALL USING (true);
 CREATE POLICY "Allow all for service role" ON system_settings FOR ALL USING (true);
+CREATE POLICY "Allow all for service role" ON login_history FOR ALL USING (true);
