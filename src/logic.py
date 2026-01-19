@@ -183,15 +183,26 @@ def process_loan(
         if is_ng:
             has_ng = True
             
-        create_check_line(
-            check_session_id=session_id,
-            item_id=res['item_id'],
-            required_qty=res['required_qty'],
-            result=res['result'],
-            ng_reason=res.get('ng_reason'),
-            found_qty=res.get('found_qty'),
-            comment=res.get('comment')
-        )
+        try:
+            create_check_line(
+                check_session_id=session_id,
+                item_id=res['item_id'],
+                required_qty=res['required_qty'],
+                result=res['result'],
+                ng_reason=res.get('ng_reason'),
+                found_qty=res.get('found_qty'),
+                comment=res.get('comment')
+            )
+        except TypeError as e:
+            import traceback
+            st.error(f"TypeError in create_check_line: {e}")
+            st.text(f"Args: check_session_id={session_id}, item_id={res['item_id']}")
+            st.text(f"Func: {create_check_line}")
+            st.code(traceback.format_exc())
+            raise e
+        except Exception as e:
+            st.error(f"Error in create_check_line: {e}")
+            raise e
         
         if is_ng:
             # Create Issue
