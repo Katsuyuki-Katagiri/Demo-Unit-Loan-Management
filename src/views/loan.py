@@ -2,17 +2,9 @@ import streamlit as st
 import datetime
 import os
 from src.database import (
-    get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR
+    get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR, upload_session_photo
 )
 from src.logic import get_synthesized_checklist, process_loan, get_image_base64, compress_image
-
-# Supabase Storage対応
-try:
-    from src.storage import is_supabase_storage_enabled, upload_session_photo
-    _use_supabase_storage = is_supabase_storage_enabled()
-except ImportError:
-    _use_supabase_storage = False
-# ... (lines 9-217) ...
 
 
 def render_loan_view(unit_id: int):
@@ -200,42 +192,17 @@ def render_loan_view(unit_id: int):
             # Process Submission
             
             # 1. Save Photos
-            # Create a specific directory for this session photos?
-            # Or just unique filenames in uploads?
-            # Phase 2 requirement: keep it simple in uploads or struct?
-            # User requirement: "device_photo_dir（このチェックの写真保存先）"
-            # Let's make a new subdirectory YYYYMMDD_Loan_UnitID
             timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             session_dir_name = f"loan_{unit_id}_{timestamp_str}"
             
-            # Supabase Storage対応: 一時的にセッションIDとして使用
-            temp_session_id = f"{unit_id}_{timestamp_str}"
-            
-            if _use_supabase_storage:
-                # Supabase Storageにアップロード
-                if uploaded_files:
-                    for i, uf in enumerate(uploaded_files):
-                        compressed = compress_image(uf)
-                        if compressed:
-                            upload_session_photo(temp_session_id, compressed.getvalue(), i, "webp")
-                        else:
-                            upload_session_photo(temp_session_id, uf.getvalue(), i, "webp")
-            else:
-                # ローカルファイルシステムにフォールバック
-                abs_session_dir = os.path.join(UPLOAD_DIR, session_dir_name)
-                os.makedirs(abs_session_dir, exist_ok=True)
-                
-                if uploaded_files:
-                    for i, uf in enumerate(uploaded_files):
-                        compressed = compress_image(uf)
-                        if compressed:
-                            base_name = f"photo_upload_{i}"
-                            save_name = f"{base_name}.webp"
-                            with open(os.path.join(abs_session_dir, save_name), "wb") as f:
-                                f.write(compressed.getvalue())
-                        else:
-                            with open(os.path.join(abs_session_dir, uf.name), "wb") as f:
-                                f.write(uf.getvalue())
+            # Supabase Storageにアップロード
+            if uploaded_files:
+                for i, uf in enumerate(uploaded_files):
+                    compressed = compress_image(uf)
+                    if compressed:
+                        upload_session_photo(session_dir_name, compressed.getvalue(), i)
+                    else:
+                        upload_session_photo(session_dir_name, uf.getvalue(), i)
             
 
             # 2. Build Check Results List

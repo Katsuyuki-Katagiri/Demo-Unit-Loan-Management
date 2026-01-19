@@ -4,7 +4,7 @@ from src.database import (
     get_all_categories, get_device_types, get_device_units, 
     get_device_unit_by_id, get_device_type_by_id, UPLOAD_DIR,
     get_active_loan, get_user_by_id, get_check_session_by_loan_id,
-    get_category_by_id
+    get_category_by_id, get_session_photos
 )
 
 from src.logic import get_synthesized_checklist, get_image_base64
@@ -209,18 +209,33 @@ def render_home_view():
                                             st.warning("⚠️ AssetmentNeo 返却処理未確認")
                                         st.divider()
                                     # Show Photos
+                                    photo_displayed = False
                                     if sess['device_photo_dir']:
-                                        photo_dir_path = os.path.join(UPLOAD_DIR, sess['device_photo_dir'])
-                                        if os.path.exists(photo_dir_path):
-                                            photos = [f for f in os.listdir(photo_dir_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
-                                            if photos:
-                                                st.caption("記録写真")
-                                                for i in range(0, len(photos), 4):
-                                                    cols = st.columns(4)
-                                                    for j in range(4):
-                                                        if i + j < len(photos):
-                                                            cols[j].image(os.path.join(photo_dir_path, photos[i+j]), use_container_width=True)
-                                                st.divider()
+                                        # 1. Try Supabase Storage
+                                        storage_photos = get_session_photos(sess['device_photo_dir'])
+                                        if storage_photos:
+                                            st.caption("記録写真 (Storage)")
+                                            for i in range(0, len(storage_photos), 4):
+                                                cols = st.columns(4)
+                                                for j in range(4):
+                                                    if i + j < len(storage_photos):
+                                                        cols[j].image(storage_photos[i+j], use_container_width=True)
+                                            st.divider()
+                                            photo_displayed = True
+                                        
+                                        # 2. Fallback to Local Storage (if no storage photos or for historical data)
+                                        if not photo_displayed:
+                                            photo_dir_path = os.path.join(UPLOAD_DIR, sess['device_photo_dir'])
+                                            if os.path.exists(photo_dir_path):
+                                                photos = [f for f in os.listdir(photo_dir_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
+                                                if photos:
+                                                    st.caption("記録写真 (Local)")
+                                                    for i in range(0, len(photos), 4):
+                                                        cols = st.columns(4)
+                                                        for j in range(4):
+                                                            if i + j < len(photos):
+                                                                cols[j].image(os.path.join(photo_dir_path, photos[i+j]), use_container_width=True)
+                                                    st.divider()
 
                                     lines = get_check_session_lines(sess['id'])
                                     if not lines:

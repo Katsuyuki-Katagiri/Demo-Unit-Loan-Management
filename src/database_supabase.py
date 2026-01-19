@@ -110,6 +110,67 @@ def get_photo_public_url(filename: str) -> str:
         return ""
 
 
+# セッション写真用バケット（貸出・返却時の写真）
+SESSION_PHOTOS_BUCKET = "session-photos"
+
+
+def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> str:
+    """
+    貸出・返却時のセッション写真をSupabase Storageにアップロード
+    
+    Args:
+        session_id: セッションID（例: loan_123_20260119_120000）
+        file_bytes: 画像のバイトデータ
+        index: 写真の連番
+    
+    Returns:
+        公開URL（str）、失敗時は空文字列
+    """
+    client = get_client()
+    filename = f"{session_id}/photo_{index}.webp"
+    
+    try:
+        result = client.storage.from_(SESSION_PHOTOS_BUCKET).upload(
+            path=filename,
+            file=file_bytes,
+            file_options={"content-type": "image/webp", "upsert": "true"}
+        )
+        
+        public_url = client.storage.from_(SESSION_PHOTOS_BUCKET).get_public_url(filename)
+        return public_url
+        
+    except Exception as e:
+        print(f"Session photo upload error: {e}")
+        return ""
+
+
+def get_session_photos(session_id: str) -> list:
+    """
+    セッションの写真URL一覧を取得
+    
+    Args:
+        session_id: セッションID
+    
+    Returns:
+        公開URLのリスト
+    """
+    client = get_client()
+    try:
+        # フォルダ内のファイル一覧を取得
+        result = client.storage.from_(SESSION_PHOTOS_BUCKET).list(session_id)
+        if result:
+            urls = []
+            for item in result:
+                if item.get('name'):
+                    url = client.storage.from_(SESSION_PHOTOS_BUCKET).get_public_url(f"{session_id}/{item['name']}")
+                    urls.append(url)
+            return urls
+        return []
+    except Exception as e:
+        print(f"Get session photos error: {e}")
+        return []
+
+
 def init_db():
     """データベース初期化（Supabaseでは主にディレクトリ作成のみ）"""
     os.makedirs("data", exist_ok=True)

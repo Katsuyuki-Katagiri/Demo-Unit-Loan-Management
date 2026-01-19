@@ -1302,6 +1302,27 @@ def migrate_phase4():
     conn.commit()
     conn.close()
 
+# --- Supabase Storage Dummies ---
+
+def upload_photo_to_storage(file_bytes: bytes, filename: str) -> str:
+    # SQLite版ではローカル保存されるため、この関数は使用されないか、
+    # 必要ならローカル保存ロジックを入れるべきだが、
+    # 現状の実装ロジックでは呼び出し側で分岐等している前提とするか、
+    # ここでは空を返す
+    return ""
+
+def delete_photo_from_storage(filename: str) -> bool:
+    return False
+
+def get_photo_public_url(filename: str) -> str:
+    return ""
+
+def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> str:
+    return ""
+
+def get_session_photos(session_id: str) -> list:
+    return []
+
 def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
     # Ensure schema is up to date (needed for new Assetment columns if not yet run)
     migrate_returns_assetment_check()
