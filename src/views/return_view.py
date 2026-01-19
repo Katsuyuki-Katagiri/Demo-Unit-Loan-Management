@@ -133,9 +133,13 @@ def render_return_view(unit_id: int):
                 st.caption(f"必要数: {item['required_qty']}")
                 
                 if item['photo_path']:
-                    full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
-                    if os.path.exists(full_path):
-                        st.image(full_path, width=100)
+                    # URLの場合は直接使用
+                    if item['photo_path'].startswith('http'):
+                        st.image(item['photo_path'], width=100)
+                    else:
+                        full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
+                        if os.path.exists(full_path):
+                            st.image(full_path, width=100)
 
             with r2:
                 # Result Toggle

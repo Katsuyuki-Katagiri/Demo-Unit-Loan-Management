@@ -27,10 +27,87 @@ def get_client() -> Client:
         _supabase = get_supabase_client()
     return _supabase
 
-# アップロードディレクトリ（写真用）
+# アップロードディレクトリ（写真用）- ローカルフォールバック用
 UPLOAD_DIR = os.path.join("data", "uploads")
 # SQLite互換性のためのダミーパス（Supabase使用時は実際には使用されない）
 DB_PATH = os.path.join("data", "app.db")
+# Supabase Storage バケット名
+STORAGE_BUCKET = "item-photos"
+
+
+# --- Supabase Storage ---
+
+def upload_photo_to_storage(file_bytes: bytes, filename: str) -> str:
+    """
+    Supabase Storageに写真をアップロードし、公開URLを返す
+    
+    Args:
+        file_bytes: アップロードするファイルのバイトデータ
+        filename: ファイル名（ユニークにすること推奨）
+    
+    Returns:
+        公開URL（str）、失敗時は空文字列
+    """
+    client = get_client()
+    try:
+        # Storageにアップロード
+        result = client.storage.from_(STORAGE_BUCKET).upload(
+            path=filename,
+            file=file_bytes,
+            file_options={"content-type": "image/webp", "upsert": "true"}
+        )
+        
+        # 公開URLを取得
+        public_url = client.storage.from_(STORAGE_BUCKET).get_public_url(filename)
+        return public_url
+        
+    except Exception as e:
+        print(f"Storage upload error: {e}")
+        return ""
+
+
+def delete_photo_from_storage(filename: str) -> bool:
+    """
+    Supabase Storageから写真を削除
+    
+    Args:
+        filename: 削除するファイル名
+    
+    Returns:
+        成功時True、失敗時False
+    """
+    client = get_client()
+    try:
+        client.storage.from_(STORAGE_BUCKET).remove([filename])
+        return True
+    except Exception as e:
+        print(f"Storage delete error: {e}")
+        return False
+
+
+def get_photo_public_url(filename: str) -> str:
+    """
+    ファイル名から公開URLを取得
+    
+    Args:
+        filename: ファイル名
+    
+    Returns:
+        公開URL（str）
+    """
+    if not filename:
+        return ""
+    
+    # すでにURLの場合はそのまま返す
+    if filename.startswith("http"):
+        return filename
+    
+    client = get_client()
+    try:
+        return client.storage.from_(STORAGE_BUCKET).get_public_url(filename)
+    except Exception as e:
+        print(f"Get public URL error: {e}")
+        return ""
 
 
 def init_db():

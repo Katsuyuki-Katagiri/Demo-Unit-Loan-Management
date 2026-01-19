@@ -328,15 +328,19 @@ def render_home_view():
             for item in checklist:
                 img_tag = ""
                 if item['photo_path']:
-                    full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
-                    if os.path.exists(full_path):
-                        b64_str = get_image_base64(full_path)
-                        if b64_str:
-                            img_tag = f'<img src="data:image/png;base64,{b64_str}" style="max-width: 100%; max-height: 100%; object-fit: contain;">'
-                        else:
-                            img_tag = '<div style="color: #888; font-size: 0.8em;">Image Error</div>'
+                    # URLの場合は直接使用、ローカルパスの場合は既存処理
+                    if item['photo_path'].startswith('http'):
+                        img_tag = f'<img src="{item["photo_path"]}" style="max-width: 100%; max-height: 100%; object-fit: contain;">'
                     else:
-                        img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
+                        full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
+                        if os.path.exists(full_path):
+                            b64_str = get_image_base64(full_path)
+                            if b64_str:
+                                img_tag = f'<img src="data:image/png;base64,{b64_str}" style="max-width: 100%; max-height: 100%; object-fit: contain;">'
+                            else:
+                                img_tag = '<div style="color: #888; font-size: 0.8em;">Image Error</div>'
+                        else:
+                            img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
                 else:
                     img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
 

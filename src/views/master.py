@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import shutil
+import uuid
 from datetime import datetime, date
 from src.logic import compress_image
 from src.database import (
@@ -10,7 +11,7 @@ from src.database import (
     get_unit_overrides, update_device_unit, UPLOAD_DIR,
     update_item, delete_item, update_device_type_name,
     delete_device_type, get_all_departments, update_category_managing_department,
-    get_department_by_id
+    get_department_by_id, upload_photo_to_storage
 )
 
 
@@ -394,17 +395,16 @@ def render_master_view():
                             # 構成品マスタ用：より強い圧縮（最大400x400, 品質40）
                             compressed = compress_image(uploaded_file, max_size=(400, 400), quality=40)
                             if compressed:
-                                base, _ = os.path.splitext(uploaded_file.name)
-                                save_name = f"{base}.webp"
-                                save_path = os.path.join(UPLOAD_DIR, save_name)
-                                with open(save_path, "wb") as f:
-                                    f.write(compressed.getbuffer())
+                                # ユニークなファイル名を生成
+                                unique_name = f"item_{uuid.uuid4().hex[:8]}.webp"
+                                # Supabase Storageにアップロード
+                                photo_url = upload_photo_to_storage(compressed.getvalue(), unique_name)
+                                if photo_url:
+                                    photo_path = photo_url
+                                else:
+                                    st.warning("写真のアップロードに失敗しました")
                             else:
-                                save_name = uploaded_file.name
-                                save_path = os.path.join(UPLOAD_DIR, save_name)
-                                with open(save_path, "wb") as f:
-                                    f.write(uploaded_file.getbuffer())
-                            photo_path = save_name
+                                st.warning("写真の圧縮に失敗しました")
                         create_item(item_name, item_tips, photo_path)
                         st.cache_data.clear()
                         st.success(f"登録しました: {item_name}")
@@ -425,9 +425,13 @@ def render_master_view():
                 with st.expander(f"{i['name']}"):
                     c_img, c_txt = st.columns([1, 2])
                     if i['photo_path']:
-                        fp = os.path.join(UPLOAD_DIR, i['photo_path'])
-                        if os.path.exists(fp):
-                            c_img.image(fp)
+                        # URLの場合は直接表示、ローカルパスの場合は既存の処理
+                        if i['photo_path'].startswith('http'):
+                            c_img.image(i['photo_path'])
+                        else:
+                            fp = os.path.join(UPLOAD_DIR, i['photo_path'])
+                            if os.path.exists(fp):
+                                c_img.image(fp)
                     c_txt.write(i['tips'])
                     
                     st.divider()
@@ -445,17 +449,16 @@ def render_master_view():
                                 # 構成品マスタ用：より強い圧縮（最大400x400, 品質40）
                                 compressed = compress_image(new_file, max_size=(400, 400), quality=40)
                                 if compressed:
-                                    base, _ = os.path.splitext(new_file.name)
-                                    save_name = f"{base}.jpg"
-                                    save_path = os.path.join(UPLOAD_DIR, save_name)
-                                    with open(save_path, "wb") as f:
-                                        f.write(compressed.getbuffer())
+                                    # ユニークなファイル名を生成
+                                    unique_name = f"item_{uuid.uuid4().hex[:8]}.webp"
+                                    # Supabase Storageにアップロード
+                                    photo_url = upload_photo_to_storage(compressed.getvalue(), unique_name)
+                                    if photo_url:
+                                        photo_path = photo_url
+                                    else:
+                                        st.warning("写真のアップロードに失敗しました")
                                 else:
-                                    save_name = new_file.name
-                                    save_path = os.path.join(UPLOAD_DIR, save_name)
-                                    with open(save_path, "wb") as f:
-                                        f.write(new_file.getbuffer())
-                                photo_path = save_name
+                                    st.warning("写真の圧縮に失敗しました")
                                 
                             if update_item(i['id'], new_name, new_tips, photo_path):
                                 st.cache_data.clear()

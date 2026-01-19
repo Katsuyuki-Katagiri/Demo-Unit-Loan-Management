@@ -119,17 +119,21 @@ def render_loan_view(unit_id: int):
                 # Show image if exists
                 # Show image if exists
                 if item['photo_path']:
-                    full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
-                    if os.path.exists(full_path):
-                        # Use same logic as Home View
-                        b64 = get_image_base64(full_path)
-                        if b64:
-                            st.markdown(f'<img src="data:image/png;base64,{b64}" style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">', unsafe_allow_html=True)
-                        else:
-                            st.caption("Load Error")
+                    # URLの場合は直接使用
+                    if item['photo_path'].startswith('http'):
+                        st.markdown(f'<img src="{item["photo_path"]}" style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">', unsafe_allow_html=True)
                     else:
-                        # Placeholder
-                        st.markdown('<div style="width: 120px; height: 120px; background-color: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #888;">No Image</div>', unsafe_allow_html=True)
+                        full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
+                        if os.path.exists(full_path):
+                            # Use same logic as Home View
+                            b64 = get_image_base64(full_path)
+                            if b64:
+                                st.markdown(f'<img src="data:image/png;base64,{b64}" style="width: 120px; height: 120px; object-fit: contain; border: 1px solid #ddd; border-radius: 4px;">', unsafe_allow_html=True)
+                            else:
+                                st.caption("Load Error")
+                        else:
+                            # Placeholder
+                            st.markdown('<div style="width: 120px; height: 120px; background-color: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #888;">No Image</div>', unsafe_allow_html=True)
                 else:
                     st.markdown('<div style="width: 120px; height: 120px; background-color: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #888;">No Image</div>', unsafe_allow_html=True)
 
