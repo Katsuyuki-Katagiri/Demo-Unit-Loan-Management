@@ -725,13 +725,23 @@ def resolve_issue(issue_id: int, resolved_by: str = ""):
 
 # --- Returns ---
 
-def create_return(loan_id: int, return_date: str, checker_user_id: int = None):
+def create_return(
+    loan_id: int, 
+    return_date: str, 
+    checker_user_id: int = None, 
+    assetment_returned: bool = False, 
+    notes: str = None, 
+    confirmation_checked: bool = False
+):
     """返却を作成"""
     client = get_client()
     result = client.table("returns").insert({
         "loan_id": loan_id,
         "return_date": return_date,
-        "checker_user_id": checker_user_id
+        "checker_user_id": checker_user_id,
+        "assetment_returned": assetment_returned,
+        "notes": notes,
+        "confirmation_checked": confirmation_checked
     }).execute()
     if result.data:
         return result.data[0]["id"]
