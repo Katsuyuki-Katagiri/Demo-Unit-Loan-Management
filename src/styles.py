@@ -243,69 +243,92 @@ def apply_custom_css():
         </style>
     """, unsafe_allow_html=True)
     
-    # Scroll to top and close sidebar on mobile using components.html with delay for page render
     import streamlit.components.v1 as components
     components.html(
         """
         <script>
-            // ブラウザが記憶しているサイドバーの状態を強制的に閉じるに設定
-            try {
-                window.parent.localStorage.setItem("sidebarState", "collapsed");
-            } catch (e) {
-                console.error("Failed to access localStorage");
-            }
+            // ページロード直後のサイドバー監視・強制クローズ処理
+            (function() {
+                var isMobile = window.parent.innerWidth <= 998 || window.innerWidth <= 998;
+                if (!isMobile) return;
 
-            // Delayed execution to ensure page is fully rendered
-            setTimeout(function() {
-                // Scroll to top
-                try {
-                    window.parent.scrollTo(0, 0);
-                } catch (e) {}
+                // 監視のタイムアウト設定（10秒間だけ監視して、その後は解放する）
+                var startTime = Date.now();
+                var monitorDuration = 10000; // 10秒
 
-                // モバイルでサイドバーを確実に閉じるためのポーリング処理
-                var checkCount = 0;
-                var maxChecks = 50; // 15秒間監視
-                
-                var sidebarChecker = setInterval(function() {
-                    checkCount++;
-                    if (checkCount > maxChecks) {
-                        clearInterval(sidebarChecker);
-                        return;
-                    }
-
-                    // モバイル判定 (幅998px以下に緩和)
-                    var width = window.parent.innerWidth || window.innerWidth;
-                    if (width <= 998) {
-                        var doc = window.parent.document;
-                        
-                        // サイドバーの状態を確認
-                        var sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-                        var isExpanded = sidebar && (sidebar.getAttribute('aria-expanded') === 'true' || sidebar.style.width === '336px');
-                        
-                        if (isExpanded) {
-                            // 閉じボタンを探してクリック
-                            var closeButtons = [
-                                'button[aria-label="Close sidebar"]',
-                                'section[data-testid="stSidebar"] button[kind="header"]',
-                                '[data-testid="stSidebarCollapseButton"]',
-                                '[data-testid="collapsedControl"] button'
-                            ];
-                            
-                            var clicked = false;
-                            for (var i = 0; i < closeButtons.length; i++) {
-                                var btn = doc.querySelector(closeButtons[i]);
-                                if (btn) {
-                                    btn.click();
-                                    clicked = true;
-                                    break;
-                                }
+                function closeSidebar() {
+                    var doc = window.parent.document;
+                    // サイドバー要素
+                    var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+                    var appView = doc.querySelector('[data-testid="stAppViewContainer"]');
+                    
+                    // 閉じるべきか判定 (開いている場合)
+                    if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
+                        // 1. 閉じるボタンをクリック
+                        var closeButtons = doc.querySelectorAll('button[kind="header"], button[data-testid="baseButton-header"]');
+                        for (var i = 0; i < closeButtons.length; i++) {
+                            // "x" アイコンや "Close" ラベルを持つボタンを探す簡単なヒューリスティック
+                            if (closeButtons[i].innerHTML.includes('polyline') || closeButtons[i].getAttribute('aria-label') === 'Close sidebar') {
+                                closeButtons[i].click();
+                                return; // ボタンが見つかってクリックできれば終了
                             }
                         }
-                    } else {
-                        clearInterval(sidebarChecker);
+                        
+                        // 2. セレクタを変えて再トライ
+                        var collapseBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"]');
+                        if (collapseBtn) { collapseBtn.click(); return; }
+                        
+                        // 3. UI操作で見つからない場合、DOM属性を直接操作 (最終手段)
+                        // これをやるとステート不整合が起きる可能性はあるが、背に腹は代えられない
+                        sidebar.setAttribute('aria-expanded', 'false');
+                        // 親コンテナのスタイルも調整が必要な場合がある
                     }
-                }, 300);
-            }, 100);
+                }
+
+                // 初期実行
+                setTimeout(closeSidebar, 100);
+                setTimeout(closeSidebar, 500);
+                setTimeout(closeSidebar, 1000);
+
+                // MutationObserverで属性変化を監視
+                var observer = new MutationObserver(function(mutations) {
+                    if (Date.now() - startTime > monitorDuration) {
+                        observer.disconnect();
+                        return;
+                    }
+                    
+                    mutations.forEach(function(mutation) {
+                        if (mutation.type === 'attributes' && mutation.attributeName === 'aria-expanded') {
+                            var target = mutation.target;
+                            if (target.getAttribute('aria-expanded') === 'true') {
+                                // ユーザーが意図的に開いたのか、自動で開いたのかの区別は難しいが、
+                                // ロード直後(10秒以内)のオープンは「望ましくない」とみなして即閉じる
+                                // ただし、過剰な反応を防ぐため、少しデバウンスを入れるか、
+                                // ここではシンプルに「ロード直後は何が何でも閉じる」方針で行く
+                                requestAnimationFrame(closeSidebar);
+                            }
+                        }
+                    });
+                });
+
+                // 監視開始
+                var doc = window.parent.document;
+                var sidebar = doc.querySelector('[data-testid="stSidebar"]');
+                if (sidebar) {
+                    observer.observe(sidebar, { attributes: true });
+                } else {
+                    // まだサイドバーが無い場合はbody全体を監視してサイドバー出現を待つ（コスト高いが）
+                    var bodyObserver = new MutationObserver(function(mutations) {
+                        var sb = doc.querySelector('[data-testid="stSidebar"]');
+                        if (sb) {
+                            observer.observe(sb, { attributes: true });
+                            closeSidebar(); // 見つかった瞬間にも閉じる
+                            bodyObserver.disconnect();
+                        }
+                    });
+                    bodyObserver.observe(doc.body, { childList: true, subtree: true });
+                }
+            })();
         </script>
         """,
         height=0,
