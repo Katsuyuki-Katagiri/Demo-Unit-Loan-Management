@@ -139,17 +139,10 @@ def apply_custom_css():
             border-right: 1px solid #E5E7EB;
         }
         
-        /* モバイルでの初期ロード時にサイドバーを一瞬隠すハック */
-        @keyframes initSidebarMobile {
-            0% { transform: translateX(-100%); opacity: 0; }
-            80% { transform: translateX(-100%); opacity: 0; }
-            100% { transform: translateX(0); opacity: 1; }
-        }
-        
         @media screen and (max-width: 998px) {
+            /* モバイルでの調整 */
             section[data-testid="stSidebar"] {
-                /* 起動直後の1秒間だけ強制的に隠す（JSが動くまでのつなぎ） */
-                animation: initSidebarMobile 1s ease-out forwards;
+                /* 必要に応じてスタイル追加 */
             }
         }
 
