@@ -236,7 +236,7 @@ def apply_custom_css():
         </style>
     """, unsafe_allow_html=True)
     
-    # Scroll to top using components.html with delay for page render
+    # Scroll to top and close sidebar on mobile using components.html with delay for page render
     import streamlit.components.v1 as components
     components.html(
         """
@@ -249,6 +249,25 @@ def apply_custom_css():
                 if (mainSection) mainSection.scrollTo(0, 0);
                 var appViewContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
                 if (appViewContainer) appViewContainer.scrollTo(0, 0);
+                
+                // モバイルでサイドバーを閉じる
+                if (window.innerWidth <= 768 || window.parent.innerWidth <= 768) {
+                    var closeButton = window.parent.document.querySelector('[data-testid="stSidebar"] button[aria-label="Close sidebar"]');
+                    if (closeButton) {
+                        closeButton.click();
+                    } else {
+                        // 代替方法：サイドバーのデータ属性を変更
+                        var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+                        if (sidebar) {
+                            sidebar.setAttribute('aria-expanded', 'false');
+                        }
+                        // サイドバーコンテナに collapsed クラスを追加
+                        var sidebarContent = window.parent.document.querySelector('[data-testid="stSidebarContent"]');
+                        if (sidebarContent) {
+                            sidebarContent.parentElement.style.display = 'none';
+                        }
+                    }
+                }
             }, 100);
         </script>
         """,
