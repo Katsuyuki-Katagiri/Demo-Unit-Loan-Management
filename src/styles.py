@@ -251,24 +251,37 @@ def apply_custom_css():
                 if (appViewContainer) appViewContainer.scrollTo(0, 0);
                 
                 // モバイルでサイドバーを閉じる
-                if (window.innerWidth <= 768 || window.parent.innerWidth <= 768) {
-                    var closeButton = window.parent.document.querySelector('[data-testid="stSidebar"] button[aria-label="Close sidebar"]');
-                    if (closeButton) {
-                        closeButton.click();
-                    } else {
-                        // 代替方法：サイドバーのデータ属性を変更
+                var isMobile = window.parent.innerWidth <= 768 || window.innerWidth <= 768;
+                if (isMobile) {
+                    // 方法1: Streamlitのサイドバー閉じるボタンを探す（複数パターン）
+                    var closeSelectors = [
+                        '[data-testid="stSidebarCollapseButton"]',
+                        '[data-testid="collapsedControl"] button',
+                        'button[aria-label="Close sidebar"]',
+                        '[data-testid="stSidebar"] button[kind="header"]',
+                        'section[data-testid="stSidebar"] > div > button'
+                    ];
+                    
+                    var clicked = false;
+                    for (var i = 0; i < closeSelectors.length && !clicked; i++) {
+                        var btn = window.parent.document.querySelector(closeSelectors[i]);
+                        if (btn) {
+                            btn.click();
+                            clicked = true;
+                        }
+                    }
+                    
+                    // 方法2: サイドバーのdata-collapsed属性を変更
+                    if (!clicked) {
                         var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
                         if (sidebar) {
-                            sidebar.setAttribute('aria-expanded', 'false');
-                        }
-                        // サイドバーコンテナに collapsed クラスを追加
-                        var sidebarContent = window.parent.document.querySelector('[data-testid="stSidebarContent"]');
-                        if (sidebarContent) {
-                            sidebarContent.parentElement.style.display = 'none';
+                            sidebar.setAttribute('data-collapsed', 'true');
+                            sidebar.style.width = '0px';
+                            sidebar.style.minWidth = '0px';
                         }
                     }
                 }
-            }, 100);
+            }, 200);
         </script>
         """,
         height=0,
