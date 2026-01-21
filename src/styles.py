@@ -243,45 +243,57 @@ def apply_custom_css():
         <script>
             // Delayed execution to ensure page is fully rendered
             setTimeout(function() {
-                // Try multiple scroll targets
-                window.parent.scrollTo(0, 0);
-                var mainSection = window.parent.document.querySelector('section.main');
-                if (mainSection) mainSection.scrollTo(0, 0);
-                var appViewContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
-                if (appViewContainer) appViewContainer.scrollTo(0, 0);
+                // Scroll to top
+                try {
+                    window.parent.scrollTo(0, 0);
+                    var mainSection = window.parent.document.querySelector('section.main');
+                    if (mainSection) mainSection.scrollTo(0, 0);
+                    var appViewContainer = window.parent.document.querySelector('[data-testid="stAppViewContainer"]');
+                    if (appViewContainer) appViewContainer.scrollTo(0, 0);
+                } catch (e) { console.error(e); }
+
+                // モバイルでサイドバーを確実に閉じるためのポーリング処理
+                var checkCount = 0;
+                var maxChecks = 15; // 300ms * 15 = 4.5秒間監視
                 
-                // モバイルでサイドバーを閉じる
-                var isMobile = window.parent.innerWidth <= 768 || window.innerWidth <= 768;
-                if (isMobile) {
-                    // 方法1: Streamlitのサイドバー閉じるボタンを探す（複数パターン）
-                    var closeSelectors = [
-                        '[data-testid="stSidebarCollapseButton"]',
-                        '[data-testid="collapsedControl"] button',
-                        'button[aria-label="Close sidebar"]',
-                        '[data-testid="stSidebar"] button[kind="header"]',
-                        'section[data-testid="stSidebar"] > div > button'
-                    ];
-                    
-                    var clicked = false;
-                    for (var i = 0; i < closeSelectors.length && !clicked; i++) {
-                        var btn = window.parent.document.querySelector(closeSelectors[i]);
-                        if (btn) {
-                            btn.click();
-                            clicked = true;
-                        }
+                var sidebarChecker = setInterval(function() {
+                    checkCount++;
+                    if (checkCount > maxChecks) {
+                        clearInterval(sidebarChecker);
+                        return;
                     }
-                    
-                    // 方法2: サイドバーのdata-collapsed属性を変更
-                    if (!clicked) {
-                        var sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-                        if (sidebar) {
-                            sidebar.setAttribute('data-collapsed', 'true');
-                            sidebar.style.width = '0px';
-                            sidebar.style.minWidth = '0px';
+
+                    // モバイル判定 (幅768px以下)
+                    var width = window.parent.innerWidth || window.innerWidth;
+                    if (width <= 768) {
+                        var doc = window.parent.document;
+                        
+                        // サイドバーの状態を確認
+                        var sidebar = doc.querySelector('section[data-testid="stSidebar"]');
+                        if (sidebar && sidebar.getAttribute('aria-expanded') === 'true') {
+                            // 閉じボタンを探してクリック
+                            var closeBtn = doc.querySelector('section[data-testid="stSidebar"] button[aria-label="Close sidebar"]');
+                            
+                            // Streamlitのバージョンによってセレクタが異なる場合への対応
+                            if (!closeBtn) {
+                                closeBtn = doc.querySelector('section[data-testid="stSidebar"] button[kind="header"]');
+                            }
+                            if (!closeBtn) {
+                                closeBtn = doc.querySelector('[data-testid="stSidebarCollapseButton"]');
+                            }
+                            
+                            if (closeBtn) {
+                                closeBtn.click();
+                                // 成功したらループ終了（あるいは念のためもう一度確認するなら終了しない）
+                                // clearInterval(sidebarChecker); 
+                            }
                         }
+                    } else {
+                        // PCサイズなら何もしないで終了
+                        clearInterval(sidebarChecker);
                     }
-                }
-            }, 200);
+                }, 300);
+            }, 100);
         </script>
         """,
         height=0,
