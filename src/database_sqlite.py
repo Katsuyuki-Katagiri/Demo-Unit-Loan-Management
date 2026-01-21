@@ -409,6 +409,30 @@ def check_email_exists(email: str) -> bool:
     """Check if an email is already registered."""
     return get_user_by_email(email) is not None
 
+def update_user_password(user_id: int, new_password: str) -> tuple:
+    """ユーザーのパスワードを更新"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # ユーザー確認
+    c.execute("SELECT id FROM users WHERE id = ?", (user_id,))
+    if not c.fetchone():
+        conn.close()
+        return False, "ユーザーが見つかりません。"
+    
+    try:
+        password_bytes = new_password.encode('utf-8')
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password_bytes, salt)
+        
+        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (hashed, user_id))
+        conn.commit()
+        return True, "パスワードを更新しました。"
+    except Exception as e:
+        return False, f"パスワード更新エラー: {e}"
+    finally:
+        conn.close()
+
 
 # --- Master Helper Functions ---
 
@@ -428,7 +452,7 @@ def seed_categories():
     conn.commit()
     conn.close()
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def get_all_categories():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -668,7 +692,7 @@ def create_device_type(category_id: int, name: str):
     conn.commit()
     return c.lastrowid
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def get_device_types(category_id: int = None):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -698,7 +722,7 @@ def create_item(name: str, tips: str = "", photo_path: str = ""):
     conn.commit()
     return c.lastrowid
 
-@st.cache_data
+@st.cache_data(ttl=60)
 def get_all_items():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -1728,3 +1752,65 @@ def get_category_managing_department(category_id: int):
     res = c.fetchone()
     conn.close()
     return dict(res) if res else None
+
+# --- logic.py用の抽象化関数 ---
+
+def get_return_by_id(return_id: int):
+    """返却IDで返却レコードを取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM returns WHERE id = ?", (return_id,))
+    res = c.fetchone()
+    conn.close()
+    return dict(res) if res else None
+
+def reopen_loan(loan_id: int):
+    """貸出を再オープン（返却キャンセル時）"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE loans SET status = 'open' WHERE id = ?", (loan_id,))
+    conn.commit()
+    conn.close()
+
+def get_return_check_sessions(loan_id: int):
+    """返却に関連するチェックセッションを取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT id FROM check_sessions 
+        WHERE loan_id = ? AND session_type = 'return' AND (canceled = 0 OR canceled IS NULL)
+    """, (loan_id,))
+    res = [row['id'] for row in c.fetchall()]
+    conn.close()
+    return res
+
+def get_issues_by_session_id(session_id: int):
+    """セッションIDに関連するオープンなIssueを取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT id FROM issues 
+        WHERE check_session_id = ? AND (canceled = 0 OR canceled IS NULL)
+    """, (session_id,))
+    res = [row['id'] for row in c.fetchall()]
+    conn.close()
+    return res
+
+def get_loan_periods_for_unit(device_unit_id: int):
+    """稼働率計算用：個体の貸出期間一覧を取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT l.checkout_date, r.return_date, l.status, l.canceled 
+        FROM loans l
+        LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
+        WHERE l.device_unit_id = ? AND (l.canceled = 0 OR l.canceled IS NULL)
+    """, (device_unit_id,))
+    res = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return res
+

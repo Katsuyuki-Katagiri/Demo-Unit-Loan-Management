@@ -8,8 +8,9 @@ import streamlit as st
 from supabase import create_client, Client
 
 # Supabase接続
+@st.cache_resource
 def get_supabase_client() -> Client:
-    """Supabaseクライアントを取得"""
+    """Supabaseクライアントを取得（キャッシュされる）"""
     url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
     key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
     
@@ -18,14 +19,9 @@ def get_supabase_client() -> Client:
     
     return create_client(url, key)
 
-# グローバルクライアント（キャッシュ）
-_supabase: Optional[Client] = None
-
 def get_client() -> Client:
-    global _supabase
-    if _supabase is None:
-        _supabase = get_supabase_client()
-    return _supabase
+    """Supabaseクライアントを取得（st.cache_resourceでキャッシュ）"""
+    return get_supabase_client()
 
 # アップロードディレクトリ（写真用）- ローカルフォールバック用
 UPLOAD_DIR = os.path.join("data", "uploads")
@@ -277,6 +273,27 @@ def get_all_users():
 def check_email_exists(email: str) -> bool:
     """メールアドレスが登録済みか確認"""
     return get_user_by_email(email) is not None
+
+def update_user_password(user_id: int, new_password: str) -> tuple:
+    """ユーザーのパスワードを更新"""
+    client = get_client()
+    
+    # ユーザー確認
+    result = client.table("users").select("id").eq("id", user_id).execute()
+    if not result.data:
+        return False, "ユーザーが見つかりません。"
+    
+    try:
+        password_bytes = new_password.encode('utf-8')
+        salt = bcrypt.gensalt()
+        hashed = bcrypt.hashpw(password_bytes, salt).decode('utf-8')
+        
+        client.table("users").update({
+            "password_hash": hashed
+        }).eq("id", user_id).execute()
+        return True, "パスワードを更新しました。"
+    except Exception as e:
+        return False, f"パスワード更新エラー: {e}"
 
 # --- Categories ---
 
@@ -661,21 +678,6 @@ def get_check_sessions_for_unit(device_unit_id: int, limit: int = 10):
     client = get_client()
     result = client.table("check_sessions").select("*").eq("device_unit_id", device_unit_id).eq("canceled", 0).order("performed_at", desc=True).limit(limit).execute()
     return result.data
-
-# --- Check Lines ---
-
-def create_check_line(check_session_id: int, item_id: int, required_qty: int, result_val: str, ng_reason: str = None, found_qty: int = None, comment: str = None):
-    """チェック行を作成"""
-    client = get_client()
-    client.table("check_lines").insert({
-        "check_session_id": check_session_id,
-        "item_id": item_id,
-        "required_qty": required_qty,
-        "result": result_val,
-        "ng_reason": ng_reason,
-        "found_qty": found_qty,
-        "comment": comment
-    }).execute()
 
 def get_check_lines_for_session(session_id: int):
     """セッションのチェック行を取得"""
@@ -1317,3 +1319,52 @@ def get_login_history(user_id: int = None, limit: int = 100):
     
     result = query.order("login_at", desc=True).limit(limit).execute()
     return result.data
+
+# --- logic.py用の抽象化関数 ---
+
+def get_return_by_id(return_id: int):
+    """返却IDで返却レコードを取得"""
+    client = get_client()
+    result = client.table("returns").select("*").eq("id", return_id).execute()
+    if result.data:
+        return result.data[0]
+    return None
+
+def reopen_loan(loan_id: int):
+    """貸出を再オープン（返却キャンセル時）"""
+    client = get_client()
+    client.table("loans").update({"status": "open"}).eq("id", loan_id).execute()
+
+def get_return_check_sessions(loan_id: int):
+    """返却に関連するチェックセッションを取得"""
+    client = get_client()
+    result = client.table("check_sessions").select("id").eq("loan_id", loan_id).eq("session_type", "return").eq("canceled", 0).execute()
+    return [row['id'] for row in result.data]
+
+def get_issues_by_session_id(session_id: int):
+    """セッションIDに関連するオープンなIssueを取得"""
+    client = get_client()
+    result = client.table("issues").select("id").eq("check_session_id", session_id).eq("canceled", 0).execute()
+    return [row['id'] for row in result.data]
+
+def get_loan_periods_for_unit(device_unit_id: int):
+    """稼働率計算用：個体の貸出期間一覧を取得"""
+    client = get_client()
+    
+    # 貸出を取得
+    loans_result = client.table("loans").select("id, checkout_date, status, canceled").eq("device_unit_id", device_unit_id).eq("canceled", 0).execute()
+    
+    results = []
+    for loan in loans_result.data:
+        # 対応する返却を取得
+        return_result = client.table("returns").select("return_date").eq("loan_id", loan["id"]).eq("canceled", 0).execute()
+        return_date = return_result.data[0]["return_date"] if return_result.data else None
+        
+        results.append({
+            "checkout_date": loan["checkout_date"],
+            "return_date": return_date,
+            "status": loan["status"],
+            "canceled": loan["canceled"]
+        })
+    
+    return results

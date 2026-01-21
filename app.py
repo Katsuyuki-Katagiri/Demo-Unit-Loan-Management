@@ -39,6 +39,52 @@ if 'db_initialized' not in st.session_state:
     seed_categories()
     st.session_state['db_initialized'] = True
 
+def _render_password_change_dialog():
+    """パスワード変更ダイアログを表示"""
+    from src.database import update_user_password, get_user_by_id
+    from src.auth import check_password
+    
+    @st.dialog("🔑 パスワード変更")
+    def password_dialog():
+        st.write("新しいパスワードを設定してください。")
+        
+        current_password = st.text_input("現在のパスワード", type="password")
+        new_password = st.text_input("新しいパスワード", type="password")
+        new_password_confirm = st.text_input("新しいパスワード（確認）", type="password")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("変更", type="primary", use_container_width=True):
+                if not current_password or not new_password or not new_password_confirm:
+                    st.error("すべての項目を入力してください。")
+                elif new_password != new_password_confirm:
+                    st.error("新しいパスワードが一致しません。")
+                elif len(new_password) < 4:
+                    st.error("パスワードは4文字以上にしてください。")
+                else:
+                    # 現在のパスワードを確認
+                    user_id = st.session_state.get('user_id')
+                    user = get_user_by_id(user_id)
+                    
+                    if user and check_password(current_password, user['password_hash']):
+                        success, message = update_user_password(user_id, new_password)
+                        if success:
+                            st.success(message)
+                            st.session_state['show_password_change'] = False
+                            st.rerun()
+                        else:
+                            st.error(message)
+                    else:
+                        st.error("現在のパスワードが正しくありません。")
+        
+        with col2:
+            if st.button("キャンセル", use_container_width=True):
+                st.session_state['show_password_change'] = False
+                st.rerun()
+    
+    password_dialog()
+
 def main():
     # 1. Check if Setup is needed
     if not check_users_exist():
@@ -70,9 +116,19 @@ def main():
         selected_page = st.radio("メニュー", page_options)
         
         st.divider()
+        
+        # パスワード変更（管理者のみ）
+        if st.session_state.get('user_role') == 'admin':
+            if st.button("🔑 パスワード変更"):
+                st.session_state['show_password_change'] = True
+        
         if st.button("ログアウト", type="primary"):
             logout_user()
             st.rerun()
+    
+    # パスワード変更ダイアログ
+    if st.session_state.get('show_password_change'):
+        _render_password_change_dialog()
 
     # Routing
     if selected_page == "ホーム":

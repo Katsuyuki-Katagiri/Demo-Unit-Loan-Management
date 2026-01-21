@@ -48,89 +48,168 @@
 ### 8. マスタ管理
 - **機種・構成品管理**: 管理者による機種や構成品の登録・編集・削除機能
 - **カテゴリ表示/非表示**: カテゴリの可視性を制御
+- **部署管理**: ユーザーを部署ごとに管理
 - **データ初期化機能 (Admin Only)**: 全データを初期化する管理者機能
 
-### 9. 設定
+### 9. 設定・ユーザー管理
 - **SMTP設定**: メール通知のためのSMTPサーバー設定
-- **ユーザー管理**: ユーザーの追加・削除
-- **通知グループ**: カテゴリごとの通知先メンバー設定
+- **部署管理**: ユーザーをグループ化する部署の管理
+- **ユーザー管理**: ユーザーの追加・削除・部署設定
+- **パスワード変更（Admin Only）**: 管理者が自分のパスワードを変更可能（サイドバーから操作）
+- **通知グループ**: カテゴリごとの通知先メンバー設定（個別追加/部署一括追加）
 - **通知ログ**: 送信履歴の確認
 
 ### 10. 分析
 - **稼働率分析**: 機器ごとの貸出稼働率を期間指定で計算
 
 ## 技術スタック
-- **Frontend/Backend**: Python (Streamlit)
-- **Database**: SQLite (`data/app.db`)
-- **UI Styling**: Custom CSS (`src/styles.py`), Material Symbols Rounded
-- **画像処理**: Pillow (WebP圧縮対応)
-- **Environment**: Windows 11 (PowerShell)
+
+| カテゴリ | 技術 |
+|----------|------|
+| Frontend/Backend | Python (Streamlit 1.30+) |
+| Database | SQLite (ローカル) または Supabase (クラウド) |
+| 認証 | bcrypt (パスワードハッシュ化) |
+| UI Styling | Custom CSS (`src/styles.py`), Material Symbols Rounded |
+| 画像処理 | Pillow (WebP圧縮対応) |
+| データベース切替 | 環境変数による自動切替（SQLite ↔ Supabase）|
 
 ## ディレクトリ構成
 ```
-├── app.py                 # メインアプリケーション
+├── app.py                    # メインアプリケーション
 ├── src/
-│   ├── views/             # 画面UIコンポーネント
-│   │   ├── home.py        # ホーム画面
-│   │   ├── loan.py        # 貸出登録画面
-│   │   ├── return_view.py # 返却登録画面
-│   │   ├── master.py      # マスタ管理画面
-│   │   ├── settings.py    # 設定画面
-│   │   ├── analytics.py   # 分析画面
-│   │   ├── login.py       # ログイン画面
-│   │   └── setup.py       # 初期セットアップ画面
-│   ├── database.py        # データベース操作
-│   ├── logic.py           # ビジネスロジック・通知処理
-│   ├── auth.py            # 認証機能
-│   ├── styles.py          # グローバルCSS定義
-│   └── ui.py              # 共通UIコンポーネント
+│   ├── views/                # 画面UIコンポーネント
+│   │   ├── home.py           # ホーム画面
+│   │   ├── loan.py           # 貸出登録画面
+│   │   ├── return_view.py    # 返却登録画面
+│   │   ├── master.py         # マスタ管理画面
+│   │   ├── settings.py       # 設定画面（SMTP、ユーザー、通知グループ）
+│   │   ├── analytics.py      # 分析画面
+│   │   ├── login.py          # ログイン画面
+│   │   └── setup.py          # 初期セットアップ画面
+│   ├── database.py           # データベースディスパッチャー（SQLite/Supabase自動切替）
+│   ├── database_sqlite.py    # SQLiteデータベース操作
+│   ├── database_supabase.py  # Supabaseデータベース操作
+│   ├── logic.py              # ビジネスロジック・通知処理
+│   ├── auth.py               # 認証機能
+│   ├── storage.py            # ストレージ操作（ローカル/Supabase Storage）
+│   ├── styles.py             # グローバルCSS定義
+│   └── ui.py                 # 共通UIコンポーネント
 ├── data/
-│   ├── app.db             # SQLiteデータベース
-│   └── uploads/           # アップロード画像
+│   ├── app.db                # SQLiteデータベース（ローカルモード時）
+│   └── uploads/              # アップロード画像
+├── docs/
+│   ├── DEPLOYMENT_MANUAL.md  # Streamlit Cloudデプロイ手順
+│   └── SUPABASE_SETUP.md     # Supabaseセットアップ手順
+├── scripts/
+│   └── supabase_schema.sql   # Supabase用スキーマ
 ├── .streamlit/
-│   └── config.toml        # Streamlit設定
-├── Start_App.bat          # アプリ起動用バッチファイル
-├── install_deps.bat       # 依存関係インストール用
-└── requirements.txt       # Python依存関係
+│   ├── config.toml           # Streamlit設定
+│   └── secrets.toml          # Supabase接続情報（Git管理外）
+├── Start_App.bat             # アプリ起動用バッチファイル
+├── install_deps.bat          # 依存関係インストール用
+└── requirements.txt          # Python依存関係
 ```
 
 ## セットアップと実行
 
 ### 必要要件
-- Python 3.10+
+- Python 3.10以上
 
 ### 初期設定 (初回のみ)
+
 1. **依存関係のインストール**:
    ```powershell
    install_deps.bat
    ```
+   または
+   ```powershell
+   pip install -r requirements.txt
+   ```
 
-### アプリケーションの起動 (簡単起動)
+### アプリケーションの起動
+
+#### 方法1: バッチファイル（推奨）
 以下のバッチファイルをダブルクリックしてください。
-```powershell
+```
 Start_App.bat
 ```
 自動的にサーバーが立ち上がり、ブラウザが開きます。
 
-### 手動での起動
+#### 方法2: コマンドライン
 ```powershell
-& ".venv\Scripts\streamlit" run app.py
+streamlit run app.py
 ```
 
-### 初期アカウント
-- **Email**: `admin@example.com`
-- **Password**: `admin123`
+ブラウザで `http://localhost:8501` にアクセスします。
 
-> **注意**: `admin@example.com` はRFC 2606で予約されたドメインのため、実際のメール送信はできません。本番運用時は実際のメールアドレスを持つユーザーを作成してください。
+## 初回起動
+
+初回起動時は**管理者アカウントの作成画面**が表示されます。
+- メールアドレス、氏名、パスワードを入力して管理者アカウントを作成してください。
+- 作成後、そのアカウントでログインできます。
+
+## データベースモード
+
+### ローカルモード（SQLite）
+デフォルトでは、`data/app.db` にSQLiteデータベースが作成されます。
+セットアップは不要で、すぐに使用できます。
+
+### クラウドモード（Supabase）
+Supabaseを使用する場合は、`.streamlit/secrets.toml` に以下を設定してください：
+
+```toml
+SUPABASE_URL = "https://your-project-id.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+詳細は [docs/SUPABASE_SETUP.md](docs/SUPABASE_SETUP.md) を参照してください。
+
+> アプリケーションは自動的に環境変数を検出し、SQLiteかSupabaseかを判定します。
+
+## クラウドデプロイ
+
+### Streamlit Cloud
+1. GitHubリポジトリをStreamlit Cloudに接続
+2. Secretsに `SUPABASE_URL` と `SUPABASE_KEY` を設定
+3. デプロイ
+
+詳細は [docs/DEPLOYMENT_MANUAL.md](docs/DEPLOYMENT_MANUAL.md) を参照してください。
 
 ## ユーザー権限
+
 | 権限 | 説明 |
 |------|------|
 | admin | 全機能にアクセス可能（マスタ管理、設定、データ初期化） |
 | user | 貸出・返却操作、履歴閲覧 |
 | related | 関連業者向け（限定的なアクセス） |
 
+## セキュリティ
+
+- **パスワード**: bcryptでハッシュ化して保存
+- **パスワード変更**: 管理者のみがサイドバーから自分のパスワードを変更可能
+- **APIキー**: `.streamlit/secrets.toml` に保存し、`.gitignore` で除外
+- **セッション管理**: Streamlitのセッションステートを使用
+
 ## 更新履歴
-- **2026-01-17**: 貸出/返却時の通知グループへのグループ通知機能を追加
-- **2026-01-12**: メール通知機能の改善、履歴写真表示機能追加
-- **2026-01-10**: UI改善、データリセット機能追加
+
+| 日付 | 内容 |
+|------|------|
+| 2026-01-21 | パスワード変更機能追加、Supabase接続設定更新 |
+| 2026-01-21 | コードレビュー＆リファクタリング（SQLite直接使用修正、キャッシュTTL統一、重複コード削除） |
+| 2026-01-18 | Supabase統合エラー修正 |
+| 2026-01-17 | 貸出/返却時の通知グループへのグループ通知機能を追加 |
+| 2026-01-12 | メール通知機能の改善、履歴写真表示機能追加、点検日表示機能追加 |
+| 2026-01-10 | UI改善、データリセット機能追加 |
+| 2025-12-28 | 初期リリース |
+
+## ライセンス
+
+このプロジェクトは社内利用を目的としています。
+
+## サポート
+
+問題が発生した場合は、以下を確認してください：
+1. `data/app.db` が存在するか（SQLiteモード時）
+2. `.streamlit/secrets.toml` にSupabase設定が正しいか（クラウドモード時）
+3. Python依存関係がインストールされているか
+4. アプリを再起動してみる（`Ctrl+C` で停止後、再度 `Start_App.bat` を実行）

@@ -1,7 +1,6 @@
 from src.database import (
-    get_template_lines, get_unit_overrides, DB_PATH
+    get_template_lines, get_unit_overrides
 )
-import sqlite3
 import threading
 from PIL import Image, ImageOps # type: ignore
 import base64
@@ -329,48 +328,24 @@ def perform_cancellation(target_type: str, target_id: int, user_name: str, reaso
         # Cancel Return
         cancel_record('returns', target_id, user_name, reason)
         
-        # We need to find the Loan ID to RE-OPEN it
-        # But get_related_records doesn't give us the loan ID from return ID easily unless we query.
-        # Let's assume the caller passes the loan_id or we fetch it.
-        # Fetch return to get loan_id
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        c.execute("SELECT loan_id FROM returns WHERE id = ?", (target_id,))
-        ret_row = c.fetchone()
-        conn.close()
+        # 返却レコードからloan_idを取得（DB抽象化層を使用）
+        from src.database import get_return_by_id, reopen_loan, get_return_check_sessions, get_issues_by_session_id
+        
+        ret_row = get_return_by_id(target_id)
         
         if ret_row:
             loan_id = ret_row['loan_id']
-            # Re-open Loan
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute("UPDATE loans SET status = 'open' WHERE id = ?", (loan_id,))
-            conn.commit()
-            conn.close()
+            # 貸出を再オープン
+            reopen_loan(loan_id)
             
-            # Cascade: Cancel Return CheckSession and its Issues
-            # We need to find the check session linked to this return.
-            # CheckSession has no return_id column directly, but session_type='return' and loan_id=?
-            # Wait, `check_sessions` has `loan_id`. If multiple returns for same loan (re-return?), creates ambiguity.
-            # But typically 1 loan = 1 return.
-            # However, safer to search check_session by timestamp proximity or assume strict 1:1 if possible.
-            # For this phase, let's look for session_type='return' and loan_id=loan_id AND not canceled.
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute("SELECT id FROM check_sessions WHERE loan_id = ? AND session_type = 'return' AND (canceled=0 OR canceled IS NULL)", (loan_id,))
-            sessions = c.fetchall()
-            conn.close()
+            # 返却に関連するチェックセッションを取得してキャンセル
+            sessions = get_return_check_sessions(loan_id)
             
-            for (sess_id,) in sessions:
+            for sess_id in sessions:
                 cancel_record('check_sessions', sess_id, user_name, "Cascade from Return Cancel")
-                # Cancel issues linked to this session
-                conn = sqlite3.connect(DB_PATH)
-                c = conn.cursor()
-                c.execute("SELECT id FROM issues WHERE check_session_id = ? AND (canceled=0 OR canceled IS NULL)", (sess_id,))
-                issues = c.fetchall()
-                conn.close()
-                for (iss_id,) in issues:
+                # セッションに関連するIssueをキャンセル
+                issues = get_issues_by_session_id(sess_id)
+                for iss_id in issues:
                     cancel_record('issues', iss_id, user_name, "Cascade from Return Cancel")
 
     recalculate_unit_status(device_unit_id)
@@ -757,17 +732,9 @@ def calculate_utilization(device_unit_id: int, start_date_str: str, end_date_str
         
     occupied_days = 0
     
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("""
-        SELECT l.checkout_date, r.return_date, l.status, l.canceled 
-        FROM loans l
-        LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
-        WHERE l.device_unit_id = ? AND (l.canceled = 0 OR l.canceled IS NULL)
-    """, (device_unit_id,))
-    loans = c.fetchall()
-    conn.close()
+    # DB抽象化層を使用して貸出期間を取得
+    from src.database import get_loan_periods_for_unit
+    loans = get_loan_periods_for_unit(device_unit_id)
     
     occupied_dates = set()
     
