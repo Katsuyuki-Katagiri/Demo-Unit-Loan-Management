@@ -109,10 +109,196 @@ def get_photo_public_url(filename: str) -> str:
 # セッション写真用バケット（貸出・返却時の写真）
 SESSION_PHOTOS_BUCKET = "session-photos"
 
+# 写真保存上限数
+SESSION_PHOTOS_LIMIT = 2000
+
+
+def count_all_session_photos() -> int:
+    """
+    session-photosバケット内の全写真数をカウント
+    
+    Returns:
+        写真の総数
+    """
+    client = get_client()
+    try:
+        # ルートフォルダ一覧を取得
+        folders = client.storage.from_(SESSION_PHOTOS_BUCKET).list("")
+        total_count = 0
+        
+        for folder in folders:
+            folder_name = folder.get("name", "")
+            if folder_name and folder.get("id") is None:  # フォルダの場合（idがない）
+                # フォルダ内のファイル一覧を取得
+                files = client.storage.from_(SESSION_PHOTOS_BUCKET).list(folder_name)
+                for f in files:
+                    if f.get("name") and f.get("id"):  # ファイルの場合（idがある）
+                        total_count += 1
+        
+        return total_count
+    except Exception as e:
+        print(f"Count session photos error: {e}")
+        return 0
+
+
+def get_protected_session_folders() -> set:
+    """
+    削除対象から除外すべきセッションフォルダを取得
+    （返却されていない貸出に関連するセッション）
+    
+    Returns:
+        保護すべきフォルダ名のセット
+    """
+    client = get_client()
+    protected = set()
+    
+    try:
+        # ステータスが open（返却されていない）の貸出を取得
+        open_loans = client.table("loans").select("id").eq("status", "open").eq("canceled", 0).execute()
+        
+        if not open_loans.data:
+            return protected
+        
+        open_loan_ids = [loan["id"] for loan in open_loans.data]
+        
+        # オープン貸出に関連するチェックセッションの device_photo_dir を取得
+        for loan_id in open_loan_ids:
+            sessions = client.table("check_sessions").select("device_photo_dir").eq("loan_id", loan_id).execute()
+            for session in sessions.data:
+                photo_dir = session.get("device_photo_dir", "")
+                if photo_dir:
+                    protected.add(photo_dir)
+        
+        return protected
+    except Exception as e:
+        print(f"Get protected folders error: {e}")
+        return protected
+
+
+def get_oldest_session_folders(limit: int = 10) -> list:
+    """
+    最も古いセッションフォルダを取得（作成日時順）
+    ※返却されていない貸出に関連するフォルダは除外
+    
+    Args:
+        limit: 取得するフォルダ数
+    
+    Returns:
+        古い順にソートされたフォルダ名のリスト
+    """
+    client = get_client()
+    try:
+        folders = client.storage.from_(SESSION_PHOTOS_BUCKET).list("")
+        
+        # 保護すべきフォルダを取得
+        protected_folders = get_protected_session_folders()
+        
+        # フォルダ情報を収集（created_atでソート）
+        folder_list = []
+        for folder in folders:
+            folder_name = folder.get("name", "")
+            created_at = folder.get("created_at", "")
+            if folder_name and folder.get("id") is None:  # フォルダの場合
+                # 保護対象フォルダは除外
+                if folder_name in protected_folders:
+                    continue
+                folder_list.append({
+                    "name": folder_name,
+                    "created_at": created_at
+                })
+        
+        # 作成日時の古い順にソート
+        folder_list.sort(key=lambda x: x.get("created_at", ""))
+        
+        # 指定数まで返す
+        return [f["name"] for f in folder_list[:limit]]
+    except Exception as e:
+        print(f"Get oldest folders error: {e}")
+        return []
+
+
+def delete_session_folder(folder_name: str) -> tuple:
+    """
+    セッションフォルダとその中のファイルを全て削除
+    
+    Args:
+        folder_name: 削除するフォルダ名
+    
+    Returns:
+        (成功: True/False, 削除したファイル数)
+    """
+    client = get_client()
+    try:
+        # フォルダ内のファイル一覧を取得
+        files = client.storage.from_(SESSION_PHOTOS_BUCKET).list(folder_name)
+        
+        if not files:
+            return True, 0
+        
+        # ファイルパスのリストを作成
+        file_paths = []
+        for f in files:
+            if f.get("name"):
+                file_paths.append(f"{folder_name}/{f['name']}")
+        
+        if file_paths:
+            # ファイルを削除
+            client.storage.from_(SESSION_PHOTOS_BUCKET).remove(file_paths)
+        
+        return True, len(file_paths)
+    except Exception as e:
+        print(f"Delete session folder error: {e}")
+        return False, 0
+
+
+def cleanup_old_session_photos() -> tuple:
+    """
+    写真が上限を超えている場合、古いセッションフォルダを削除
+    
+    Returns:
+        (削除したフォルダ数, 削除した写真数)
+    """
+    try:
+        total_photos = count_all_session_photos()
+        
+        if total_photos <= SESSION_PHOTOS_LIMIT:
+            return 0, 0
+        
+        # 削除が必要な写真数
+        photos_to_delete = total_photos - SESSION_PHOTOS_LIMIT
+        deleted_folders = 0
+        deleted_photos = 0
+        
+        # 古いフォルダから順に削除
+        while deleted_photos < photos_to_delete:
+            oldest_folders = get_oldest_session_folders(5)
+            
+            if not oldest_folders:
+                break
+            
+            for folder_name in oldest_folders:
+                success, count = delete_session_folder(folder_name)
+                if success:
+                    deleted_folders += 1
+                    deleted_photos += count
+                    print(f"セッション写真クリーンアップ: {folder_name} を削除 ({count}枚)")
+                
+                if deleted_photos >= photos_to_delete:
+                    break
+        
+        print(f"セッション写真クリーンアップ完了: {deleted_folders}フォルダ, {deleted_photos}枚を削除")
+        return deleted_folders, deleted_photos
+        
+    except Exception as e:
+        print(f"Cleanup old session photos error: {e}")
+        return 0, 0
+
 
 def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> str:
     """
     貸出・返却時のセッション写真をSupabase Storageにアップロード
+    
+    アップロード後、写真総数が上限（2000枚）を超えていれば古いものから削除
     
     Args:
         session_id: セッションID（例: loan_123_20260119_120000）
@@ -133,6 +319,16 @@ def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> 
         )
         
         public_url = client.storage.from_(SESSION_PHOTOS_BUCKET).get_public_url(filename)
+        
+        # アップロード成功後、古い写真をクリーンアップ（バックグラウンドで実行）
+        # index == 0の時のみクリーンアップを実行（セッションの最初の写真時のみ）
+        if index == 0:
+            try:
+                cleanup_old_session_photos()
+            except Exception as cleanup_error:
+                # クリーンアップエラーはログのみ、アップロード成功は維持
+                print(f"Cleanup error (non-critical): {cleanup_error}")
+        
         return public_url
         
     except Exception as e:
