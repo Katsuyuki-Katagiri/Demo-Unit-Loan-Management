@@ -282,36 +282,9 @@ def render_return_view(unit_id: int):
                 )
                 
                 if result_status == 'in_stock':
-                    st.markdown("""
-                    <div style="
-                        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-                        color: white;
-                        padding: 12px 10px;
-                        border-radius: 10px;
-                        text-align: center;
-                        margin: 10px 0;
-                    ">
-                        <div style="font-size: 28px;">✓</div>
-                        <div style="font-size: 16px; font-weight: 700;">返却登録完了</div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.toast("返却登録完了", icon="✓")
                 else:
-                    st.markdown("""
-                    <div style="
-                        background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
-                        color: white;
-                        padding: 12px 10px;
-                        border-radius: 10px;
-                        text-align: center;
-                        margin: 10px 0;
-                    ">
-                        <div style="font-size: 28px;">!</div>
-                        <div style="font-size: 16px; font-weight: 700;">登録完了（要対応）</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                import time
-                time.sleep(1.5)
+                    st.toast("登録完了（要対応）", icon="⚠️")
                 
                 # Clear state and go back to device type list (機種一覧)
                 st.session_state['return_mode'] = False

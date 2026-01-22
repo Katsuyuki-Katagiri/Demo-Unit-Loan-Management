@@ -504,6 +504,58 @@ import json
 import threading
 from email.mime.text import MIMEText
 
+
+def _get_smtp_config() -> tuple:
+    """
+    SMTP設定を取得する共通ヘルパー関数。
+    
+    Returns:
+        (smtp_enabled: bool, smtp_config: dict)
+    """
+    smtp_config_json = get_system_setting('smtp_config')
+    smtp_enabled = False
+    smtp_config = {}
+    
+    if smtp_config_json:
+        try:
+            smtp_config = json.loads(smtp_config_json)
+            smtp_enabled = smtp_config.get('enabled', False)
+        except json.JSONDecodeError:
+            pass  # 不正なJSON形式は無視
+    
+    return smtp_enabled, smtp_config
+
+
+def _send_email(smtp_config: dict, recipient_email: str, subject: str, body: str) -> tuple:
+    """
+    SMTPでメールを送信する共通ヘルパー関数。
+    
+    Args:
+        smtp_config: SMTP設定の辞書
+        recipient_email: 送信先メールアドレス
+        subject: 件名
+        body: 本文
+    
+    Returns:
+        (success: bool, error_msg: str or None)
+    """
+    try:
+        msg = MIMEText(body)
+        msg['Subject'] = subject
+        msg['From'] = smtp_config.get('from_addr', 'noreply@example.com')
+        msg['To'] = recipient_email
+        
+        with smtplib.SMTP(smtp_config.get('host', 'localhost'), int(smtp_config.get('port', 25))) as server:
+            if smtp_config.get('user') and smtp_config.get('password'):
+                if int(smtp_config.get('port', 25)) == 587:
+                    server.starttls()
+                server.login(smtp_config.get('user'), smtp_config.get('password'))
+            server.send_message(msg)
+        
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
 def trigger_issue_notification(device_unit_id: int, issue_id: int, component_name: str, issue_description: str, reporter_name: str = "Unknown", comment: str = None):
     """
     Wrapper to trigger notification in background thread.
@@ -528,15 +580,7 @@ def _blocking_issue_notification(device_unit_id: int, issue_id: int, component_n
         return # No one to notify
         
     # 2. SMTP Settings
-    smtp_config_json = get_system_setting('smtp_config')
-    smtp_enabled = False
-    smtp_config = {}
-    if smtp_config_json:
-        try:
-            smtp_config = json.loads(smtp_config_json)
-            smtp_enabled = smtp_config.get('enabled', False)
-        except:
-            pass
+    smtp_enabled, smtp_config = _get_smtp_config()
             
     # 3. Get managing department name
     managing_dept = get_category_managing_department(category_id)
@@ -610,15 +654,7 @@ def _blocking_user_notification(user_id: int, subject: str, body: str, log_event
     recipient_name = user['name']
     
     # SMTP Config
-    smtp_config_json = get_system_setting('smtp_config')
-    smtp_enabled = False
-    smtp_config = {}
-    if smtp_config_json:
-        try:
-            smtp_config = json.loads(smtp_config_json)
-            smtp_enabled = smtp_config.get('enabled', False)
-        except:
-            pass
+    smtp_enabled, smtp_config = _get_smtp_config()
             
     log_status = 'logged_only'
     error_msg = None
@@ -674,15 +710,7 @@ def _blocking_group_notification(device_unit_id: int, subject: str, body: str, l
         return  # 通知先なし
         
     # 2. SMTP Settings
-    smtp_config_json = get_system_setting('smtp_config')
-    smtp_enabled = False
-    smtp_config = {}
-    if smtp_config_json:
-        try:
-            smtp_config = json.loads(smtp_config_json)
-            smtp_enabled = smtp_config.get('enabled', False)
-        except:
-            pass
+    smtp_enabled, smtp_config = _get_smtp_config()
             
     # 3. メンバー全員に送信
     for m in members:

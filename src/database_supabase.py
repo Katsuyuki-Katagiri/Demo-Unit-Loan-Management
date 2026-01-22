@@ -323,11 +323,16 @@ def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> 
         # アップロード成功後、古い写真をクリーンアップ（バックグラウンドで実行）
         # index == 0の時のみクリーンアップを実行（セッションの最初の写真時のみ）
         if index == 0:
-            try:
-                cleanup_old_session_photos()
-            except Exception as cleanup_error:
-                # クリーンアップエラーはログのみ、アップロード成功は維持
-                print(f"Cleanup error (non-critical): {cleanup_error}")
+            import threading
+            def _background_cleanup():
+                try:
+                    cleanup_old_session_photos()
+                except Exception as cleanup_error:
+                    # クリーンアップエラーはログのみ、アップロード成功は維持
+                    print(f"Cleanup error (non-critical): {cleanup_error}")
+            
+            cleanup_thread = threading.Thread(target=_background_cleanup, daemon=True)
+            cleanup_thread.start()
         
         return public_url
         
