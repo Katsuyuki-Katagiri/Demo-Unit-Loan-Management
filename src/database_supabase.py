@@ -25,6 +25,21 @@ def get_client() -> Client:
     """Supabaseクライアントを取得（st.cache_resourceでキャッシュ）"""
     return get_supabase_client()
 
+def retry_supabase_query(max_retries=3, delay=1, exceptions=(httpx.ReadError, httpx.ConnectError)):
+    """Supabaseクエリのリトライデコレータ"""
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            for i in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except exceptions:
+                    if i == max_retries - 1:
+                        raise
+                    time.sleep(delay * (i + 1))
+            return func(*args, **kwargs) # Should not be reached
+        return wrapper
+    return decorator
+
 # アップロードディレクトリ（写真用）- ローカルフォールバック用
 UPLOAD_DIR = os.path.join("data", "uploads")
 # SQLite互換性のためのダミーパス（Supabase使用時は実際には使用されない）
@@ -418,6 +433,7 @@ def get_user_by_id(user_id: int):
         return result.data[0]
     return None
 
+@retry_supabase_query()
 def check_users_exist() -> bool:
     """ユーザーが存在するか確認"""
     client = get_client()
@@ -917,22 +933,12 @@ def create_issue(device_unit_id: int, check_session_id: int = None, summary: str
         return result.data[0]["id"]
     return None
 
+@retry_supabase_query()
 def get_open_issues_for_unit(device_unit_id: int):
     """個体のオープンな問題を取得（リトライ付き）"""
     client = get_client()
-    max_retries = 3
-    for i in range(max_retries):
-        try:
-            result = client.table("issues").select("*").eq("device_unit_id", device_unit_id).eq("status", "open").eq("canceled", 0).execute()
-            return result.data
-        except httpx.ReadError:
-            if i == max_retries - 1:
-                raise
-            time.sleep(1 * (i + 1))  # Exponential backoff-like wait
-        except Exception:
-            # Other exceptions, re-raise immediately
-            raise
-    return []
+    result = client.table("issues").select("*").eq("device_unit_id", device_unit_id).eq("status", "open").eq("canceled", 0).execute()
+    return result.data
 
 def resolve_issue(issue_id: int, resolved_by: str = ""):
     """問題を解決"""
