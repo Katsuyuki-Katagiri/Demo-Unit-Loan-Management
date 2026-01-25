@@ -349,9 +349,9 @@ def render_master_view():
                 if current_lines:
                     st.markdown("**現在の構成:**")
                     from src.database import delete_template_line
-                    for line in current_lines:
+                    for idx, line in enumerate(current_lines, 1):
                         c1, c2 = st.columns([8, 1])
-                        c1.text(f"・ {line['item_name']} (必要数: {line['required_qty']})")
+                        c1.text(f"{idx}. {line['item_name']} (必要数: {line['required_qty']})")
                         if c2.button("🗑️", key=f"del_line_{line['id']}", help="この構成品を削除"):
                              delete_template_line(selected_type_id, line['item_id'])
                              st.cache_data.clear()
