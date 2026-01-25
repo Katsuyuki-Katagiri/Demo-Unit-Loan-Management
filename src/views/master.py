@@ -20,6 +20,8 @@ def render_master_view():
     render_header("マスタ管理", "settings")
     
     # Main Tabs
+    user_role = st.session_state.get('user_role')
+    
     # Conditional Tabs
     if user_role == 'admin':
         main_tab1, main_tab2, main_tab3 = st.tabs([
