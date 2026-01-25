@@ -624,7 +624,6 @@ def create_device_type(category_id: int, name: str):
         return result.data[0]["id"]
     return None
 
-@st.cache_data(ttl=60)
 @retry_supabase_query()
 def get_device_types(category_id: int = None):
     """機種一覧を取得"""
