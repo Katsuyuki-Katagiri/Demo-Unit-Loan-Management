@@ -310,44 +310,16 @@ def render_master_view():
                                 last_check = c3.date_input("点検実施日", value=parse_date(unit['last_check_date']), format="YYYY/MM/DD")
                                 next_check = c4.date_input("次回点検予定日", value=parse_date(unit['next_check_date']), format="YYYY/MM/DD")
                                 
-                                # --- Missing Items Section ---
-                                st.markdown("##### 不足品の登録")
-                                # Get template items for this type
-                                from src.database import get_template_lines
-                                template_lines = get_template_lines(selected_type_id)
-                                item_map = {line['item_name']: line['item_id'] for line in template_lines}
-                                
-                                # Parse current missing items
-                                current_missing_str = unit.get('missing_items')
-                                default_sel = []
-                                if current_missing_str:
-                                    missing_ids = [mid.strip() for mid in str(current_missing_str).split(',') if mid.strip()]
-                                    # Find names for these IDs
-                                    id_to_name = {v: k for k, v in item_map.items()}
-                                    for mid in missing_ids:
-                                        if mid.isdigit() and int(mid) in id_to_name:
-                                            default_sel.append(id_to_name[int(mid)])
-                                
-                                selected_missing_names = st.multiselect(
-                                    "不足している構成品を選択",
-                                    options=list(item_map.keys()),
-                                    default=default_sel
-                                )
-                                
                                 if st.form_submit_button("更新"):
                                     l_str = last_check.strftime('%Y-%m-%d') if last_check else ""
                                     n_str = next_check.strftime('%Y-%m-%d') if next_check else ""
                                     
                                     # Update basic info
-                                    from src.database import update_device_unit, update_device_unit_missing_items
+                                    from src.database import update_device_unit
                                     if new_lot:
                                         if update_device_unit(unit['id'], new_lot, new_mfg, new_loc, l_str, n_str):
-                                            # Update missing items
-                                            missing_ids_to_save = [item_map[name] for name in selected_missing_names]
-                                            update_device_unit_missing_items(unit['id'], missing_ids_to_save)
-                                            
                                             st.cache_data.clear()
-                                            st.success("更新しました（不足品情報含む）")
+                                            st.success("更新しました")
                                             st.rerun()
                                         else:
                                             st.error("更新失敗 (重複など)")
@@ -426,6 +398,51 @@ def render_master_view():
                                 st.rerun()
 
 
+
+                st.divider()
+                
+                # --- Section 3: Missing Items Management ---
+                st.markdown("#### ③ 不足品管理")
+                st.caption("各ロットごとの不足品（欠品）を登録します。")
+                
+                if not units:
+                    st.info("ロットが登録されていません")
+                else:
+                    # Template lines are needed for selection
+                    # current_lines was fetched in Section 2, reuse if possible or fetch again
+                    tpl_lines = get_template_lines(selected_type_id)
+                    item_map = {line['item_name']: line['item_id'] for line in tpl_lines}
+                    
+                    for unit in units:
+                        with st.expander(f"Lot: {unit['lot_number']} (Location: {unit['location'] or '-'}) の不足品"):
+                            with st.form(f"missing_form_{unit['id']}"):
+                                from src.database import update_device_unit_missing_items
+                                
+                                # Current Missing
+                                cur_str = unit.get('missing_items')
+                                def_sel = []
+                                if cur_str:
+                                    m_ids = [m.strip() for m in str(cur_str).split(',') if m.strip()]
+                                    id_name = {v: k for k, v in item_map.items()}
+                                    for m in m_ids:
+                                        if m.isdigit() and int(m) in id_name:
+                                            def_sel.append(id_name[int(m)])
+                                
+                                sel_missing = st.multiselect(
+                                    "不足している構成品",
+                                    options=list(item_map.keys()),
+                                    default=def_sel,
+                                    key=f"ms_{unit['id']}"
+                                )
+                                
+                                if st.form_submit_button("保存"):
+                                    ids_to_save = [item_map[n] for n in sel_missing]
+                                    if update_device_unit_missing_items(unit['id'], ids_to_save):
+                                        st.cache_data.clear()
+                                        st.success("不足品情報を更新しました")
+                                        st.rerun()
+                                    else:
+                                        st.error("更新失敗")
 
     # --- Tab 2: Item Master ---
     with main_tab2:
