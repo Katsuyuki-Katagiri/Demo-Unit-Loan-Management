@@ -361,19 +361,30 @@ def render_master_view():
                 
                 with st.expander("構成品を追加/編集"):
                     st.caption("※希望する構成品がない場合は「構成品マスタ」タブから構成品を追加してください")
+                    
+                    # 検索フィルター
+                    filter_keyword = st.text_input("🔍 構成品を検索・絞り込み", key="search_tpl_item")
+                    
                     with st.form("add_tpl_line"):
                         all_items = get_all_items()
-                        # "汚れチェック"を除外
-                        all_items = [i for i in all_items if i.get('name') != '汚れチェック']
+                        # "汚れチェック"を除外 + 検索キーワードでフィルタリング
+                        all_items = [
+                            i for i in all_items 
+                            if i.get('name') != '汚れチェック' 
+                            and (filter_keyword in i.get('name', '') if filter_keyword else True)
+                        ]
                         
                         item_opts = {f"{i['name']}": i['id'] for i in all_items}
                         sel_item_key = st.selectbox("構成品を選択", options=list(item_opts.keys()))
                         req_qty = st.number_input("必要数量", min_value=1, value=1)
                         if st.form_submit_button("追加/更新"):
-                            add_template_line(selected_type_id, item_opts[sel_item_key], req_qty)
-                            st.cache_data.clear()
-                            st.success("更新しました")
-                            st.rerun()
+                            if not sel_item_key:
+                                st.error("構成品を選択してください")
+                            else:
+                                add_template_line(selected_type_id, item_opts[sel_item_key], req_qty)
+                                st.cache_data.clear()
+                                st.success("更新しました")
+                                st.rerun()
 
 
 
@@ -416,6 +427,9 @@ def render_master_view():
 
         with col_i2:
             st.subheader("登録済み構成品一覧")
+            # 検索ボックスの追加
+            search_query = st.text_input("🔍 構成品を検索", key="search_item_master")
+
             # Reduce spacing between items
             st.markdown("""
                 <style>
@@ -426,7 +440,15 @@ def render_master_view():
             """, unsafe_allow_html=True)
             items = get_all_items()
             # "汚れチェック"はマスタ画面から非表示（返却時チェックには使用するためDBには残す）
-            items = [i for i in items if i.get('name') != '汚れチェック']
+            # 検索キーワードでフィルタリング
+            items = [
+                i for i in items 
+                if i.get('name') != '汚れチェック'
+                and (search_query in i.get('name', '') if search_query else True)
+            ]
+            
+            if not items:
+                st.info("該当する構成品はありません")
             
             for i in items:
                 # Defensive coding: missing keys protection
