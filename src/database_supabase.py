@@ -731,6 +731,19 @@ def delete_item(item_id: int):
     except Exception as e:
         return False, str(e)
 
+@retry_supabase_query()
+def update_device_unit_missing_items(unit_id: int, missing_items_ids: list[int]) -> bool:
+    """機材の不足品リストを更新（カンマ区切りのID文字列として保存）"""
+    client = get_client()
+    try:
+        # Convert list of ints to CSV string
+        csv_str = ",".join(map(str, missing_items_ids))
+        client.table("device_units").update({"missing_items": csv_str}).eq("id", unit_id).execute()
+        return True
+    except Exception as e:
+        print(f"Error updating missing items: {e}")
+        return False
+
 # --- Template Lines ---
 
 @retry_supabase_query()

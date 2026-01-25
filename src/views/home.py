@@ -359,8 +359,28 @@ def render_home_view():
         if not checklist:
             st.warning("構成品が定義されていません")
         else:
+            # Parse Missing Items
+            missing_ids = set()
+            m_str = unit.get('missing_items')
+            if m_str:
+                for x in str(m_str).split(','):
+                    if x.strip().isdigit():
+                        missing_ids.add(int(x.strip()))
+
             html_content = ""
             for item in checklist:
+                is_missing = item['item_id'] in missing_ids
+                
+                # Style overrides for missing items
+                bg_color = "transparent"
+                border_color = "rgba(128, 128, 128, 0.2)"
+                status_badge = ""
+                
+                if is_missing:
+                    bg_color = "rgba(255, 0, 0, 0.05)" # Light red background
+                    border_color = "rgba(255, 0, 0, 0.3)"
+                    status_badge = "<span style='color: red; font-weight: bold; font-size: 0.9em; margin-left: 10px;'>⚠️ 不足しています</span>"
+
                 img_tag = ""
                 if item['photo_path']:
                     # URLの場合は直接使用、ローカルパスの場合は既存処理
@@ -380,7 +400,7 @@ def render_home_view():
                     img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
 
                 name_display = item['name']
-                if item['is_override']:
+                if item.get('is_override'): # .get() safer
                     name_display += " <span style='color: orange; font-size: 0.8em;'>(個体差分)</span>"
                 
                 # Card HTML
@@ -389,12 +409,12 @@ def render_home_view():
                     display: flex; 
                     flex-direction: row; 
                     align-items: center; 
-                    border: 1px solid rgba(128, 128, 128, 0.2); 
+                    border: 1px solid {border_color}; 
                     border-radius: 8px; 
                     padding: 10px; 
                     margin-bottom: 10px; 
                     height: 120px; 
-                    background-color: transparent;
+                    background-color: {bg_color};
                 ">
                     <div style="
                         width: 120px; 
@@ -410,7 +430,10 @@ def render_home_view():
                         {img_tag}
                     </div>
                     <div style="flex-grow: 1; overflow: hidden;">
-                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">{name_display}</div>
+                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
+                            {name_display}
+                            {status_badge}
+                        </div>
                         <div style="font-size: 0.9em;">必要数: <strong>{item['required_qty']}</strong></div>
                     </div>
                 </div>
