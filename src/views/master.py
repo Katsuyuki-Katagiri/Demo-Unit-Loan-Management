@@ -233,18 +233,27 @@ def render_master_view():
                             st.session_state.confirm_delete_type = False
                             st.rerun()
                 
-                # --- Edit Device Name ---
-                with st.expander("✏️ 機種名を編集"):
-                    with st.form("edit_type_name_form"):
+                # --- Edit Device Info ---
+                with st.expander("✏️ 機種情報（名称・補足）を編集"):
+                    with st.form("edit_type_info_form"):
+                        from src.database import update_device_type_basic_info
+                        
                         new_type_name = st.text_input("機種名", value=current_type_name)
-                        if st.form_submit_button("変更"):
-                            if new_type_name and new_type_name != current_type_name:
-                                if update_device_type_name(selected_type_id, new_type_name):
+                        
+                        # current_type keys check to avoid KeyError if description missing
+                        current_desc = current_type.get('description', '') if current_type else ""
+                        new_desc = st.text_area("補足説明", value=current_desc, help="機種に関する補足情報を入力できます")
+
+                        if st.form_submit_button("変更を保存"):
+                            if new_type_name:
+                                if update_device_type_basic_info(selected_type_id, new_type_name, new_desc):
                                     st.cache_data.clear()
-                                    st.success("機種名を変更しました")
+                                    st.success("機種情報を更新しました")
                                     st.rerun()
                                 else:
-                                    st.error("エラー: その機種名は既に使用されている可能性があります")
+                                    st.error("更新エラー: 必要であればデータベースにdescriptionカラムを追加してください。")
+                            else:
+                                st.error("機種名は必須です")
                             
                 st.divider()
                 

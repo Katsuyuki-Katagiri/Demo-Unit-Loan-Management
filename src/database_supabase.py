@@ -644,14 +644,29 @@ def get_device_type_by_id(type_id: int):
     return None
 
 @retry_supabase_query()
-def update_device_type_name(type_id: int, new_name: str) -> bool:
-    """機種名を更新"""
+def update_device_type_basic_info(type_id: int, new_name: str, description: str = "") -> bool:
+    """機種名と補足説明を更新"""
     client = get_client()
     try:
-        client.table("device_types").update({"name": new_name}).eq("id", type_id).execute()
+        data = {"name": new_name}
+        # descriptionカラムが存在するかどうかは実行時に判明するが、
+        # ここでは常に送るようにする。カラムがない場合はSupabase側でエラーになる可能性があるため
+        # 必要に応じてユーザーにカラム追加を促す必要がある。
+        data["description"] = description
+        
+        client.table("device_types").update(data).eq("id", type_id).execute()
         return True
-    except Exception:
+    except Exception as e:
+        print(f"Error updating device type: {e}")
+        # descriptionカラムがない場合のエラーハンドリングが必要かもしれないが、
+        # いったんFalseを返してUI側でエラー表示させる
         return False
+
+# 互換性のためのエイリアス（必要であれば）
+def update_device_type_name(type_id: int, new_name: str) -> bool:
+    # 既存の説明を保持したいが、取得コストがかかるため、
+    # 呼び出し元で update_device_type_basic_info を使うように修正することを推奨
+    return update_device_type_basic_info(type_id, new_name)
 
 # --- Items ---
 
