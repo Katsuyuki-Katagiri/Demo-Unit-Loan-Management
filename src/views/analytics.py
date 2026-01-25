@@ -59,6 +59,11 @@ def render_analytics_view():
     target_unit_ids = []
     unit_metadata = {}  # {unit_id: (cat_name, type_name, unit)}
     
+    # DEBUG: Check data structure
+    st.write("Categories (Sample):", categories[:1] if categories else "Empty")
+    st.write("Types (Sample):", types[:1] if types else "Empty")
+    st.write("Cat Map Keys:", list(cat_map.keys()))
+    
     with st.spinner('データを集計中...'):
         for t in types:
             # Safely get category_id and id
