@@ -61,15 +61,19 @@ def render_analytics_view():
     
     with st.spinner('データを集計中...'):
         for t in types:
-            cat_name = cat_map.get(t['category_id'], "Unknown")
+            # Safely get category_id and id
+            cat_id = t.get('category_id')
+            type_id = t.get('id')
+            
+            cat_name = cat_map.get(cat_id, "Unknown")
             
             if selected_cat != "All" and cat_name != selected_cat:
                 continue
             
-            units = units_by_type.get(t['id'], [])
+            units = units_by_type.get(type_id, [])
             for u in units:
                 target_unit_ids.append(u['id'])
-                unit_metadata[u['id']] = (cat_name, t['name'], u)
+                unit_metadata[u['id']] = (cat_name, t.get('name', 'Unknown'), u)
         
         # 稼働率を一括計算（バッチクエリ）
         if target_unit_ids:
