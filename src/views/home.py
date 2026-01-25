@@ -492,13 +492,29 @@ def render_home_view():
             user_ids = [loan['checker_user_id'] for loan in active_loans.values() if loan.get('checker_user_id')]
             users_map = get_users_batch(user_ids) if user_ids else {}
             
+            # Group types by name (to handle duplicate "BP3" etc.)
+            types_by_name = {}
             for t in types:
-                # Group Header
-                st.markdown(f"**{t['name']}**")
-                if t.get('description'):
-                    st.caption(t.get('description'))
+                if t['name'] not in types_by_name:
+                    types_by_name[t['name']] = {'types': [], 'description': t.get('description', '')}
                 
-                units = units_by_type.get(t['id'], [])
+                types_by_name[t['name']]['types'].append(t)
+                # Keep the first non-empty description found
+                if not types_by_name[t['name']]['description'] and t.get('description'):
+                    types_by_name[t['name']]['description'] = t.get('description')
+
+            for type_name, group_data in types_by_name.items():
+                # Group Header
+                st.markdown(f"**{type_name}**")
+                if group_data['description']:
+                    st.caption(group_data['description'])
+                
+                # Collect units from ALL types with this name
+                combined_units = []
+                for t in group_data['types']:
+                    combined_units.extend(units_by_type.get(t['id'], []))
+                
+                units = combined_units
                 
                 # Sort units by lot number (Numeric sort if possible, else String)
                 def sort_key(u):
@@ -510,6 +526,13 @@ def render_home_view():
                         return (1, val)
                 
                 units.sort(key=sort_key)
+                
+                # Use the ID of the FIRST type for navigation if needed, 
+                # OR use the specific unit's original type ID.
+                # The 'Select' button needs unit's type_id.
+                # units list items are full unit objects?
+                # Wait, I need to know which type_id the unit belongs to for the selection state.
+                # The unit object from DB has 'device_type_id'.
                 
                 if units:
                     for unit in units:
@@ -554,7 +577,8 @@ def render_home_view():
                             
                             # Select button (Unique key per unit)
                             if st.button("選択 →", key=f"sel_u_{unit['id']}_home", use_container_width=True):
-                                st.session_state['selected_type_id'] = t['id']
+                                # Use unit's device_type_id
+                                st.session_state['selected_type_id'] = unit['device_type_id']
                                 st.session_state['selected_unit_id'] = unit['id']
                                 st.rerun()
                 else:
