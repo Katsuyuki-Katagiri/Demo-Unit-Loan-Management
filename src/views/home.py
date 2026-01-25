@@ -275,10 +275,11 @@ def render_home_view():
             can_return = (unit['status'] == 'loaned') or (active_loan)
             
             # Custom CSS for tall buttons (Primary Only) - Scoped to this view effectively by context
+            # Custom CSS for tall buttons (Primary Only) - Scoped to Main Area
             # Base style for size
             base_style = """
                 <style>
-                div.stButton > button[kind="primary"] {
+                section[data-testid="stMain"] div.stButton > button[kind="primary"] {
                     height: 100px !important;
                     font-size: 1.5em !important;
                     font-weight: bold !important;
@@ -294,11 +295,11 @@ def render_home_view():
                 # Inject Blue Color
                 st.markdown("""
                     <style>
-                    div.stButton > button[kind="primary"] {
+                    section[data-testid="stMain"] div.stButton > button[kind="primary"] {
                         background: #2196F3 !important;
                         border-color: #2196F3 !important;
                     }
-                    div.stButton > button[kind="primary"]:hover {
+                    section[data-testid="stMain"] div.stButton > button[kind="primary"]:hover {
                         background: #1976D2 !important;
                         border-color: #1976D2 !important;
                     }
@@ -314,11 +315,11 @@ def render_home_view():
                  # Inject Red Color
                  st.markdown("""
                     <style>
-                    div.stButton > button[kind="primary"] {
+                    section[data-testid="stMain"] div.stButton > button[kind="primary"] {
                         background: #F44336 !important;
                         border-color: #F44336 !important;
                     }
-                    div.stButton > button[kind="primary"]:hover {
+                    section[data-testid="stMain"] div.stButton > button[kind="primary"]:hover {
                         background: #D32F2F !important;
                         border-color: #D32F2F !important;
                     }
