@@ -58,8 +58,10 @@ def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
     Synthesize the final checklist for a specific unit.
     Base: Template Lines for device_type_id
     Apply: Unit Overrides (add/remove/qty)
+    Filter: Exclude missing items (不足品は表示しない)
     Return: List of items dict {id, name, photo_path, required_qty, ...}
     """
+    from src.database import get_device_unit_by_id
     
     # 1. Get Base Template
     # returns list of Row(id, device_type_id, item_id, required_qty, sort_order, item_name, photo_path)
@@ -106,7 +108,20 @@ def get_synthesized_checklist(device_type_id: int, device_unit_id: int):
                 'is_override': True
             }
 
-    # 3. Convert back to list and sort
+    # 3. Filter out missing items (不足品を除外)
+    unit = get_device_unit_by_id(device_unit_id)
+    missing_item_ids = set()
+    if unit and unit.get('missing_items'):
+        missing_str = unit['missing_items']
+        m_ids = [m.strip() for m in str(missing_str).split(',') if m.strip()]
+        missing_item_ids = {int(m) for m in m_ids if m.isdigit()}
+    
+    # Remove missing items from checklist
+    for missing_id in missing_item_ids:
+        if missing_id in checklist_map:
+            del checklist_map[missing_id]
+
+    # 4. Convert back to list and sort
     final_list = list(checklist_map.values())
     final_list.sort(key=lambda x: x['sort_order'])
     
