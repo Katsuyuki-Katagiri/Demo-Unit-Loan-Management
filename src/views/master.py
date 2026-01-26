@@ -254,7 +254,7 @@ def render_master_view():
                             current_missing_ids = {int(m) for m in m_ids if m.isdigit()}
                     
                     st.markdown("**現在の構成:**")
-                    st.caption("☑ = 揃っている | ☐ = 不足品")
+                    st.caption("🟢 ON = 揃っている | 🔴 OFF = 不足品")
                     
                     # 不足品を追跡するためのリスト
                     missing_items_selected = []
@@ -266,14 +266,14 @@ def render_master_view():
                         is_missing = item_id in current_missing_ids
                         
                         # 各構成品の行
-                        col_check, col_name, col_del = st.columns([1, 7, 1])
+                        col_toggle, col_name, col_del = st.columns([1, 7, 1])
                         
-                        with col_check:
-                            # チェックボックス: チェック済み = 揃っている、外れ = 不足
-                            is_available = st.checkbox(
+                        with col_toggle:
+                            # トグルスイッチ: ON = 揃っている、OFF = 不足
+                            is_available = st.toggle(
                                 "在庫",
-                                value=not is_missing,  # 不足品以外はチェック済み
-                                key=f"avail_check_{selected_type_id}_{item_id}",
+                                value=not is_missing,  # 不足品以外はON
+                                key=f"avail_toggle_{selected_type_id}_{item_id}",
                                 label_visibility="collapsed"
                             )
                             
