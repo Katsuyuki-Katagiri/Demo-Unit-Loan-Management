@@ -74,7 +74,15 @@ def render_master_view():
             else:
                 types = get_device_types(cat_options[filter_cat])
             
-            type_opts = {f"{t['name']} (ID:{t['id']})": t['id'] for t in types}
+            # ロット情報がある場合はロット番号を表示、ない場合はIDを表示
+            type_opts = {}
+            for t in types:
+                units = get_device_units(t['id'])
+                if units and units[0].get('lot_number'):
+                    label = f"{t['name']} (Lot:{units[0]['lot_number']})"
+                else:
+                    label = f"{t['name']} (ID:{t['id']})"
+                type_opts[label] = t['id']
             selected_type_key = st.radio("編集する機種を選んでください", options=list(type_opts.keys()))
 
         with col2:
