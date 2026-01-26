@@ -237,20 +237,86 @@ def render_master_view():
 
                 # --- Section 2: Component List (formerly Template) ---
                 st.markdown("#### ② 構成品一覧")
-                st.caption("この機種の標準的な付属品（チェックリスト）を定義します。")
+                st.caption("この機種の標準的な付属品（チェックリスト）を定義します。チェックを外すと不足品として登録されます。")
                 
                 # Current Template
                 current_lines = get_template_lines(selected_type_id)
                 if current_lines:
+                    from src.database import delete_template_line, update_device_unit_missing_items
+                    
+                    # 現在の不足品を取得（ロットが存在する場合）
+                    current_missing_ids = set()
+                    if units:
+                        unit = units[0]  # 1機種1ロット制限
+                        cur_str = unit.get('missing_items')
+                        if cur_str:
+                            m_ids = [m.strip() for m in str(cur_str).split(',') if m.strip()]
+                            current_missing_ids = {int(m) for m in m_ids if m.isdigit()}
+                    
                     st.markdown("**現在の構成:**")
-                    from src.database import delete_template_line
+                    st.caption("☑ = 揃っている | ☐ = 不足品")
+                    
+                    # 不足品を追跡するためのリスト
+                    missing_items_selected = []
+                    
                     for idx, line in enumerate(current_lines, 1):
-                        c1, c2 = st.columns([8, 1])
-                        c1.text(f"{idx}. {line['item_name']} (必要数: {line['required_qty']})")
-                        if c2.button("🗑️", key=f"del_line_{line['id']}", help="この構成品を削除"):
-                             delete_template_line(selected_type_id, line['item_id'])
-                             st.cache_data.clear()
-                             st.rerun()
+                        item_id = line['item_id']
+                        item_name = line['item_name']
+                        required_qty = line['required_qty']
+                        is_missing = item_id in current_missing_ids
+                        
+                        # 各構成品の行
+                        col_check, col_name, col_del = st.columns([1, 7, 1])
+                        
+                        with col_check:
+                            # チェックボックス: チェック済み = 揃っている、外れ = 不足
+                            is_available = st.checkbox(
+                                "在庫",
+                                value=not is_missing,  # 不足品以外はチェック済み
+                                key=f"avail_check_{selected_type_id}_{item_id}",
+                                label_visibility="collapsed"
+                            )
+                            
+                            # 不足品として追跡
+                            if not is_available:
+                                missing_items_selected.append(item_id)
+                        
+                        with col_name:
+                            if is_available:
+                                st.text(f"{idx}. {item_name} (必要数: {required_qty})")
+                            else:
+                                st.markdown(f"**{idx}. {item_name}** (必要数: {required_qty}) ⚠️ **不足**")
+                        
+                        with col_del:
+                            if st.button("🗑️", key=f"del_line_{line['id']}", help="この構成品を削除"):
+                                delete_template_line(selected_type_id, item_id)
+                                st.cache_data.clear()
+                                st.rerun()
+                    
+                    # 不足品の件数表示と保存ボタン
+                    st.divider()
+                    missing_count = len(missing_items_selected)
+                    
+                    col_info, col_save = st.columns([3, 1])
+                    with col_info:
+                        if missing_count > 0:
+                            st.warning(f"⚠️ 不足品: **{missing_count}件**")
+                        else:
+                            st.success("✅ 全ての構成品が揃っています")
+                    
+                    with col_save:
+                        if units:
+                            if st.button("不足品を保存", type="primary"):
+                                unit = units[0]
+                                if update_device_unit_missing_items(unit['id'], missing_items_selected):
+                                    st.cache_data.clear()
+                                    st.success("不足品情報を保存しました")
+                                    st.rerun()
+                                else:
+                                    st.error("保存に失敗しました")
+                        else:
+                            st.caption("ロット未登録")
+                    
                 else:
                     st.info("構成品が登録されていません。")
                 
@@ -357,50 +423,6 @@ def render_master_view():
 
 
 
-                st.divider()
-                
-                # --- Section 3: Missing Items Management ---
-                st.markdown("#### ③ 不足品管理")
-                st.caption("各ロットごとの不足品（欠品）を登録します。")
-                
-                if not units:
-                    st.info("ロットが登録されていません")
-                else:
-                    # Template lines are needed for selection
-                    # current_lines was fetched in Section 2, reuse if possible or fetch again
-                    tpl_lines = get_template_lines(selected_type_id)
-                    item_map = {line['item_name']: line['item_id'] for line in tpl_lines}
-                    
-                    for unit in units:
-                        with st.expander(f"Lot: {unit['lot_number']} (Location: {unit['location'] or '-'}) の不足品"):
-                            with st.form(f"missing_form_{unit['id']}"):
-                                from src.database import update_device_unit_missing_items
-                                
-                                # Current Missing
-                                cur_str = unit.get('missing_items')
-                                def_sel = []
-                                if cur_str:
-                                    m_ids = [m.strip() for m in str(cur_str).split(',') if m.strip()]
-                                    id_name = {v: k for k, v in item_map.items()}
-                                    for m in m_ids:
-                                        if m.isdigit() and int(m) in id_name:
-                                            def_sel.append(id_name[int(m)])
-                                
-                                sel_missing = st.multiselect(
-                                    "不足している構成品",
-                                    options=list(item_map.keys()),
-                                    default=def_sel,
-                                    key=f"ms_{unit['id']}"
-                                )
-                                
-                                if st.form_submit_button("保存"):
-                                    ids_to_save = [item_map[n] for n in sel_missing]
-                                    if update_device_unit_missing_items(unit['id'], ids_to_save):
-                                        st.cache_data.clear()
-                                        st.success("不足品情報を更新しました")
-                                        st.rerun()
-                                    else:
-                                        st.error("更新失敗")
 
     # --- Tab 2: Item Master ---
     with main_tab2:
