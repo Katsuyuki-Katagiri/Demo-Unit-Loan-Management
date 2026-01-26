@@ -495,6 +495,7 @@ def delete_user(user_id: int) -> tuple:
     except Exception as e:
         return False, str(e)
 
+@retry_supabase_query()
 def get_all_users():
     """全ユーザーを取得"""
     client = get_client()
@@ -505,6 +506,7 @@ def check_email_exists(email: str) -> bool:
     """メールアドレスが登録済みか確認"""
     return get_user_by_email(email) is not None
 
+@retry_supabase_query()
 def update_user_password(user_id: int, new_password: str) -> tuple:
     """ユーザーのパスワードを更新"""
     client = get_client()

@@ -116,8 +116,17 @@ def render_settings_view():
         departments = get_all_departments()
         
         if departments:
+            # パフォーマンス改善: 全ユーザーを一括取得してグループ化（N+1問題回避）
+            all_users = get_all_users()
+            users_by_dept = {}
+            for u in all_users:
+                dept_id = u.get('department_id')
+                if dept_id not in users_by_dept:
+                    users_by_dept[dept_id] = []
+                users_by_dept[dept_id].append(u)
+            
             for dept in departments:
-                users_in_dept = get_users_by_department(dept['id'])
+                users_in_dept = users_by_dept.get(dept['id'], [])
                 with st.container(border=True):
                     c1, c2, c3 = st.columns([3, 1, 1])
                     c1.markdown(f"**🏢 {dept['name']}**")
