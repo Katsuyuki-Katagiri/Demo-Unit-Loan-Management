@@ -292,8 +292,36 @@ def render_master_view():
                     st.markdown("**現在の構成:**")
                     st.caption("🔴 ON = 揃っている | ⚪ OFF = 不足品")
                     
-                    # 不足品を追跡するためのリスト
+                    # 不足品を追跡するためのリスト (計算用)
                     missing_items_selected = []
+                    
+                    # --- Auto-save callback logic ---
+                    def on_toggle_change(unit_id, item_id, key):
+                        # Get new state from session state
+                        new_state = st.session_state[key]
+                        # True = Available (Not Missing), False = Missing
+                        
+                        # Current missing items (reload from DB to be safe)
+                        from src.database import get_device_unit_by_id, update_device_unit_missing_items
+                        u = get_device_unit_by_id(unit_id)
+                        current_missing = set()
+                        if u and u.get('missing_items'):
+                            m_ids = [m.strip() for m in str(u['missing_items']).split(',') if m.strip()]
+                            current_missing = {int(m) for m in m_ids if m.isdigit()}
+                        
+                        if new_state:
+                            # Available -> Remove from missing if present
+                            if item_id in current_missing:
+                                current_missing.remove(item_id)
+                        else:
+                            # Missing -> Add to missing
+                            current_missing.add(item_id)
+                            
+                        # Save back to DB
+                        update_device_unit_missing_items(unit_id, list(current_missing))
+                        # Toast notification
+                        action = "揃っている" if new_state else "不足"
+                        st.toast(f"状態を保存しました: {action}")
                     
                     for idx, line in enumerate(current_lines, 1):
                         item_id = line['item_id']
@@ -301,21 +329,29 @@ def render_master_view():
                         required_qty = line['required_qty']
                         is_missing = item_id in current_missing_ids
                         
+                        if is_missing:
+                            missing_items_selected.append(item_id)
+                        
                         # 各構成品の行
                         col_toggle, col_name, col_del = st.columns([1, 7, 1])
                         
                         with col_toggle:
                             # トグルスイッチ: ON = 揃っている、OFF = 不足
+                            toggle_key = f"avail_toggle_{selected_type_id}_{item_id}"
+                            
+                            # Auto-save enabled toggle
+                            # Note: unit is available here (units[0])
+                            u_id = units[0]['id'] if units else 0
+                            
                             is_available = st.toggle(
                                 "在庫",
                                 value=not is_missing,  # 不足品以外はON
-                                key=f"avail_toggle_{selected_type_id}_{item_id}",
-                                label_visibility="collapsed"
+                                key=toggle_key,
+                                label_visibility="collapsed",
+                                on_change=on_toggle_change,
+                                args=(u_id, item_id, toggle_key),
+                                disabled=not units # Disable if no unit registered
                             )
-                            
-                            # 不足品として追跡
-                            if not is_available:
-                                missing_items_selected.append(item_id)
                         
                         with col_name:
                             if is_available:
@@ -329,29 +365,14 @@ def render_master_view():
                                 st.cache_data.clear()
                                 st.rerun()
                     
-                    # 不足品の件数表示と保存ボタン
+                    # 不足品の件数表示 (ボタンは削除)
                     st.divider()
                     missing_count = len(missing_items_selected)
                     
-                    col_info, col_save = st.columns([3, 1])
-                    with col_info:
-                        if missing_count > 0:
-                            st.warning(f"⚠️ 不足品: **{missing_count}件**")
-                        else:
-                            st.success("✅ 全ての構成品が揃っています")
-                    
-                    with col_save:
-                        if units:
-                            if st.button("不足品を保存", type="primary"):
-                                unit = units[0]
-                                if update_device_unit_missing_items(unit['id'], missing_items_selected):
-                                    st.cache_data.clear()
-                                    st.success("不足品情報を保存しました")
-                                    st.rerun()
-                                else:
-                                    st.error("保存に失敗しました")
-                        else:
-                            st.caption("ロット未登録")
+                    if missing_count > 0:
+                        st.warning(f"⚠️ 現在の不足品: **{missing_count}件** (自動保存されます)")
+                    else:
+                        st.success("✅ 全ての構成品が揃っています")
                     
                 else:
                     st.info("構成品が登録されていません。")
