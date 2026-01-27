@@ -508,12 +508,12 @@ def render_home_view():
                 types_by_name[t['name']]['types'].append(t)
 
             for type_name, group_data in types_by_name.items():
-                # Group Header - 区切り線スタイル
+                # Group Header - 区切り線スタイル（青アクセント）
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; margin: 20px 0 12px 0; gap: 12px;">
-                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
-                        <span style="color: #555; font-size: 1em; font-weight: 600;">{type_name}</span>
-                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
+                        <div style="flex: 1; height: 2px; background: linear-gradient(to right, transparent, #4A90D9);"></div>
+                        <span style="color: #4A90D9; font-size: 1em; font-weight: 600;">{type_name}</span>
+                        <div style="flex: 1; height: 2px; background: linear-gradient(to left, transparent, #4A90D9);"></div>
                     </div>
                 """, unsafe_allow_html=True)
                 
