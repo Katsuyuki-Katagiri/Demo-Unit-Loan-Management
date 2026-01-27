@@ -512,7 +512,7 @@ def render_home_view():
                 st.markdown(f"""
                     <div style="display: flex; align-items: center; margin: 20px 0 12px 0; gap: 12px;">
                         <div style="flex: 1; height: 2px; background: linear-gradient(to right, transparent, #4A90D9);"></div>
-                        <span style="color: #4A90D9; font-size: 1em; font-weight: 600;">{type_name}</span>
+                        <span style="color: #4A90D9; font-size: 1.15em; font-weight: 600;">{type_name}</span>
                         <div style="flex: 1; height: 2px; background: linear-gradient(to left, transparent, #4A90D9);"></div>
                     </div>
                 """, unsafe_allow_html=True)
