@@ -397,11 +397,11 @@ def render_home_view():
                             if b64_str:
                                 img_src = f"data:image/png;base64,{b64_str}"
                 
-                # 画像タグ作成
+                # 画像タグ作成（タップで新しいタブで開く）
                 if img_src:
                     img_tag = f'''<img src="{img_src}" 
                         style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: pointer; transition: transform 0.2s;" 
-                        onclick="openLightbox('{img_src}')"
+                        onclick="window.open('{img_src}', '_blank')"
                         onmouseover="this.style.transform='scale(1.05)'" 
                         onmouseout="this.style.transform='scale(1)'"
                         title="タップして拡大">'''
@@ -428,7 +428,7 @@ def render_home_view():
                 </div>
                 '''
             
-            # 完全なHTMLコンポーネント（ライトボックス含む）
+            # シンプルなHTMLコンポーネント（ライトボックスなし）
             full_html = f'''
             <!DOCTYPE html>
             <html>
@@ -443,90 +443,12 @@ def render_home_view():
                         font-family: "Source Sans Pro", sans-serif;
                         background: transparent;
                     }}
-                    /* ライトボックス オーバーレイ */
-                    .lightbox-overlay {{
-                        display: none;
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100vw;
-                        height: 100vh;
-                        background-color: rgba(0, 0, 0, 0.95);
-                        z-index: 99999;
-                        justify-content: center;
-                        align-items: center;
-                        cursor: pointer;
-                    }}
-                    .lightbox-overlay.active {{
-                        display: flex;
-                    }}
-                    .lightbox-overlay img {{
-                        max-width: 95vw;
-                        max-height: 95vh;
-                        object-fit: contain;
-                        border-radius: 8px;
-                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-                    }}
-                    .lightbox-close {{
-                        position: fixed;
-                        top: 15px;
-                        right: 20px;
-                        color: white;
-                        font-size: 50px;
-                        font-weight: bold;
-                        cursor: pointer;
-                        z-index: 100000;
-                        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-                        line-height: 1;
-                    }}
-                    .lightbox-hint {{
-                        position: fixed;
-                        bottom: 20px;
-                        left: 50%;
-                        transform: translateX(-50%);
-                        color: white;
-                        font-size: 14px;
-                        background: rgba(0,0,0,0.5);
-                        padding: 8px 16px;
-                        border-radius: 20px;
-                    }}
                 </style>
             </head>
             <body>
-                <!-- ライトボックスオーバーレイ -->
-                <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
-                    <span class="lightbox-close">&times;</span>
-                    <img id="lightbox-img" src="" alt="拡大画像">
-                    <div class="lightbox-hint">タップして閉じる</div>
-                </div>
-                
-                <!-- チェックリスト表示 -->
                 <div style="padding: 5px;">
                     {items_html}
                 </div>
-                
-                <script>
-                    function openLightbox(imgSrc) {{
-                        var overlay = document.getElementById('lightbox');
-                        var lightboxImg = document.getElementById('lightbox-img');
-                        lightboxImg.src = imgSrc;
-                        overlay.classList.add('active');
-                        document.body.style.overflow = 'hidden';
-                    }}
-                    
-                    function closeLightbox() {{
-                        var overlay = document.getElementById('lightbox');
-                        overlay.classList.remove('active');
-                        document.body.style.overflow = 'auto';
-                    }}
-                    
-                    // ESCキーで閉じる
-                    document.addEventListener('keydown', function(e) {{
-                        if (e.key === 'Escape') {{
-                            closeLightbox();
-                        }}
-                    }});
-                </script>
             </body>
             </html>
             '''
