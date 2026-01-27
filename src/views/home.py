@@ -368,64 +368,128 @@ def render_home_view():
                     if x.strip().isdigit():
                         missing_ids.add(int(x.strip()))
 
-            # 画像拡大ダイアログ
-            @st.dialog("画像拡大", width="large")
-            def show_enlarged_image(img_source, item_name):
-                st.image(img_source, use_container_width=True, caption=item_name)
-                if st.button("閉じる", use_container_width=True, type="primary"):
-                    st.rerun()
+            import streamlit.components.v1 as components
             
-            # 拡大表示が必要な場合
-            if st.session_state.get('enlarge_image_src'):
-                show_enlarged_image(
-                    st.session_state['enlarge_image_src'],
-                    st.session_state.get('enlarge_image_name', '')
-                )
-                # クリア
-                st.session_state['enlarge_image_src'] = None
-                st.session_state['enlarge_image_name'] = None
-
-            # 各構成品を表示
+            # 各構成品のデータを準備
+            items_html = ""
             for idx, item in enumerate(checklist):
                 is_missing = item['item_id'] in missing_ids
                 
-                with st.container(border=True):
-                    col_img, col_info = st.columns([1, 3])
+                # 背景色とボーダー色
+                bg_color = "transparent"
+                border_color = "rgba(128, 128, 128, 0.2)"
+                status_badge = ""
+                
+                if is_missing:
+                    bg_color = "rgba(255, 0, 0, 0.05)"
+                    border_color = "rgba(255, 0, 0, 0.3)"
+                    status_badge = "<span style='color: red; font-weight: bold; font-size: 0.9em; margin-left: 10px;'>⚠️ 不足しています</span>"
+                
+                # 画像ソースの取得
+                img_src = ""
+                if item['photo_path']:
+                    if item['photo_path'].startswith('http'):
+                        img_src = item['photo_path']
+                    else:
+                        full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
+                        if os.path.exists(full_path):
+                            b64_str = get_image_base64(full_path)
+                            if b64_str:
+                                img_src = f"data:image/png;base64,{b64_str}"
+                
+                # 画像タグ作成（タップでインライン拡大）
+                if img_src:
+                    img_tag = f'''<img src="{img_src}" 
+                        id="img_{idx}"
+                        class="thumbnail"
+                        style="max-width: 100%; max-height: 100%; object-fit: contain; cursor: pointer; transition: all 0.3s ease;" 
+                        onclick="toggleImage({idx}, '{img_src}')"
+                        title="タップして拡大">'''
+                else:
+                    img_tag = '<div style="color: #888; font-size: 0.8em;">No Image</div>'
+                
+                # 名前表示
+                name_display = item['name']
+                if item.get('is_override'):
+                    name_display += " <span style='color: orange; font-size: 0.8em;'>(個体差分)</span>"
+                
+                items_html += f'''
+                <div id="card_{idx}" style="display: flex; flex-direction: row; align-items: center; border: 1px solid {border_color}; border-radius: 8px; padding: 10px; margin-bottom: 10px; min-height: 140px; background-color: {bg_color};">
+                    <div id="imgContainer_{idx}" style="width: 120px; height: 100px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-right: 15px; background-color: rgba(128, 128, 128, 0.05); border-radius: 4px; transition: all 0.3s ease;">
+                        {img_tag}
+                    </div>
+                    <div id="info_{idx}" style="flex-grow: 1;">
+                        <div style="font-weight: bold; font-size: 1.1em; margin-bottom: 5px;">
+                            {name_display}
+                            {status_badge}
+                        </div>
+                        <div style="font-size: 0.9em;">必要数: <strong>{item['required_qty']}</strong></div>
+                    </div>
+                </div>
+                <!-- 拡大表示エリア（非表示） -->
+                <div id="expanded_{idx}" style="display: none; margin-bottom: 15px; text-align: center; background: #f8f8f8; border-radius: 8px; padding: 10px;">
+                    <img src="{img_src}" style="max-width: 100%; max-height: 70vh; object-fit: contain; cursor: pointer; border-radius: 4px;" onclick="toggleImage({idx}, '{img_src}')">
+                    <div style="margin-top: 8px; color: #666; font-size: 0.9em;">タップして閉じる</div>
+                </div>
+                '''
+            
+            # HTMLコンポーネント
+            full_html = f'''
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    * {{
+                        margin: 0;
+                        padding: 0;
+                        box-sizing: border-box;
+                    }}
+                    body {{
+                        font-family: "Source Sans Pro", sans-serif;
+                        background: transparent;
+                    }}
+                    .thumbnail:hover {{
+                        transform: scale(1.05);
+                        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+                    }}
+                </style>
+            </head>
+            <body>
+                <div style="padding: 5px;">
+                    {items_html}
+                </div>
+                
+                <script>
+                    var expandedId = null;
                     
-                    with col_img:
-                        # 画像の取得
-                        img_data = None
-                        if item['photo_path']:
-                            if item['photo_path'].startswith('http'):
-                                img_data = item['photo_path']
-                            else:
-                                full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
-                                if os.path.exists(full_path):
-                                    img_data = full_path
+                    function toggleImage(idx, imgSrc) {{
+                        var card = document.getElementById('card_' + idx);
+                        var expanded = document.getElementById('expanded_' + idx);
                         
-                        if img_data:
-                            # サムネイル画像を表示
-                            st.image(img_data, use_container_width=True)
-                            # 拡大ボタン
-                            if st.button("🔍 拡大", key=f"enlarge_{idx}", use_container_width=True):
-                                st.session_state['enlarge_image_src'] = img_data
-                                st.session_state['enlarge_image_name'] = item['name']
-                                st.rerun()
-                        else:
-                            st.caption("No Image")
-                    
-                    with col_info:
-                        # 名前と状態バッジ
-                        name_display = item['name']
-                        if item.get('is_override'):
-                            name_display += " 🔶(個体差分)"
+                        // 既に他の画像が拡大表示中なら閉じる
+                        if (expandedId !== null && expandedId !== idx) {{
+                            document.getElementById('expanded_' + expandedId).style.display = 'none';
+                        }}
                         
-                        if is_missing:
-                            st.markdown(f"**{name_display}** <span style='color: red;'>⚠️ 不足</span>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"**{name_display}**")
-                        
-                        st.write(f"必要数: **{item['required_qty']}**")
+                        // トグル
+                        if (expanded.style.display === 'none') {{
+                            expanded.style.display = 'block';
+                            expandedId = idx;
+                            // スムーズスクロール
+                            expanded.scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+                        }} else {{
+                            expanded.style.display = 'none';
+                            expandedId = null;
+                        }}
+                    }}
+                </script>
+            </body>
+            </html>
+            '''
+            
+            # 高さを動的に計算（アイテム数 × 約160px + 余裕）
+            component_height = len(checklist) * 180 + 100
+            components.html(full_html, height=component_height, scrolling=True)
 
     # --- Level 2: Device Units List ---
     elif st.session_state.get('selected_type_id'):
