@@ -368,6 +368,98 @@ def render_home_view():
                     if x.strip().isdigit():
                         missing_ids.add(int(x.strip()))
 
+            # ライトボックス（画像拡大表示）用のCSS/JavaScript
+            lightbox_style = """
+            <style>
+            /* ライトボックス オーバーレイ */
+            .lightbox-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(0, 0, 0, 0.9);
+                z-index: 9999;
+                justify-content: center;
+                align-items: center;
+                cursor: pointer;
+            }
+            .lightbox-overlay.active {
+                display: flex;
+            }
+            .lightbox-overlay img {
+                max-width: 95%;
+                max-height: 95%;
+                object-fit: contain;
+                border-radius: 8px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            }
+            /* 閉じるボタン */
+            .lightbox-close {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                color: white;
+                font-size: 40px;
+                font-weight: bold;
+                cursor: pointer;
+                z-index: 10000;
+                text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            }
+            /* タップ可能な画像スタイル */
+            .clickable-image {
+                cursor: pointer;
+                transition: transform 0.2s, box-shadow 0.2s;
+            }
+            .clickable-image:hover {
+                transform: scale(1.05);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
+            /* タップヒント */
+            .tap-hint {
+                position: absolute;
+                bottom: 5px;
+                right: 5px;
+                background: rgba(0, 0, 0, 0.6);
+                color: white;
+                font-size: 0.7em;
+                padding: 2px 6px;
+                border-radius: 4px;
+                pointer-events: none;
+            }
+            </style>
+            
+            <div class="lightbox-overlay" id="lightbox" onclick="closeLightbox()">
+                <span class="lightbox-close">&times;</span>
+                <img id="lightbox-img" src="" alt="拡大画像">
+            </div>
+            
+            <script>
+            function openLightbox(imgSrc) {
+                var overlay = document.getElementById('lightbox');
+                var lightboxImg = document.getElementById('lightbox-img');
+                lightboxImg.src = imgSrc;
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeLightbox() {
+                var overlay = document.getElementById('lightbox');
+                overlay.classList.remove('active');
+                document.body.style.overflow = 'auto';
+            }
+            
+            // ESCキーで閉じる
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeLightbox();
+                }
+            });
+            </script>
+            """
+            st.markdown(lightbox_style, unsafe_allow_html=True)
+
             html_content = ""
             for item in checklist:
                 is_missing = item['item_id'] in missing_ids
@@ -383,16 +475,19 @@ def render_home_view():
                     status_badge = "<span style='color: red; font-weight: bold; font-size: 0.9em; margin-left: 10px;'>⚠️ 不足しています</span>"
 
                 img_tag = ""
+                img_src = ""  # 拡大表示用のソースURLを保持
                 if item['photo_path']:
                     # URLの場合は直接使用、ローカルパスの場合は既存処理
                     if item['photo_path'].startswith('http'):
-                        img_tag = f'<img src="{item["photo_path"]}" style="max-width: 100%; max-height: 100%; object-fit: contain;">'
+                        img_src = item['photo_path']
+                        img_tag = f'<img src="{img_src}" class="clickable-image" onclick="openLightbox(\'{img_src}\')" style="max-width: 100%; max-height: 100%; object-fit: contain;" title="タップして拡大">'
                     else:
                         full_path = os.path.join(UPLOAD_DIR, item['photo_path'])
                         if os.path.exists(full_path):
                             b64_str = get_image_base64(full_path)
                             if b64_str:
-                                img_tag = f'<img src="data:image/png;base64,{b64_str}" style="max-width: 100%; max-height: 100%; object-fit: contain;">'
+                                img_src = f"data:image/png;base64,{b64_str}"
+                                img_tag = f'<img src="{img_src}" class="clickable-image" onclick="openLightbox(\'{img_src}\')" style="max-width: 100%; max-height: 100%; object-fit: contain;" title="タップして拡大">'
                             else:
                                 img_tag = '<div style="color: #888; font-size: 0.8em;">Image Error</div>'
                         else:
