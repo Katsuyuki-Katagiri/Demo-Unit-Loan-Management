@@ -91,14 +91,33 @@ def render_master_view():
             # ID -> Label Map for reverse lookup
             id_to_label = {}
             
+            # 機種名とロット番号でソートするためのリストを作成
+            # (機種名, ロット番号（数値化）, ラベル, ID) のタプルリスト
+            sortable_list = []
             for t in types:
                 units = units_by_type.get(t['id'], [])
                 if units and units[0].get('lot_number'):
-                    label = f"{t['name']} (Lot:{units[0]['lot_number']})"
+                    lot_number = units[0]['lot_number']
+                    label = f"{t['name']} (Lot:{lot_number})"
+                    # ロット番号を数値に変換（数値でない場合は文字列としてソート）
+                    try:
+                        lot_sort_key = int(lot_number)
+                    except (ValueError, TypeError):
+                        lot_sort_key = float('inf')  # 数値でない場合は最後に配置
                 else:
+                    lot_number = None
                     label = f"{t['name']} (ID:{t['id']})"
-                type_opts[label] = t['id']
-                id_to_label[t['id']] = label
+                    lot_sort_key = float('inf')  # ロットがない場合も最後に配置
+                
+                sortable_list.append((t['name'], lot_sort_key, label, t['id']))
+            
+            # 機種名（昇順）→ ロット番号（昇順）でソート
+            sortable_list.sort(key=lambda x: (x[0], x[1]))
+            
+            # ソート後のリストからtype_optsとid_to_labelを構築
+            for _, _, label, type_id in sortable_list:
+                type_opts[label] = type_id
+                id_to_label[type_id] = label
             
             # Determine initial selection based on ID
             # Use 'master_device_selector' key for widget state persistence
