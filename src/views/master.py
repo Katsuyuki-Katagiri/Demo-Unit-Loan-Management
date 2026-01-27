@@ -153,54 +153,42 @@ def render_master_view():
                     st.session_state['master_selected_type_id'] = type_opts[selected_label]
 
             # 4. 機種ごとにグループ化して表示
-            # セクションヘッダー用のスタイル
-            st.markdown("""
-                <style>
-                .device-type-header {
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 8px 16px;
-                    border-radius: 8px;
-                    margin-top: 16px;
-                    margin-bottom: 8px;
-                    font-weight: 600;
-                    font-size: 0.95em;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                }
-                .device-type-header:first-child {
-                    margin-top: 0;
-                }
-                </style>
-            """, unsafe_allow_html=True)
-            
             st.markdown("##### 編集する機種を選んでください")
             
             # 機種ごとにグループ化
-            current_device_name = None
+            device_groups = {}
             for device_name, lot_sort_key, label, type_id in sortable_list:
-                # 機種が変わった場合、ヘッダーを表示
-                if device_name != current_device_name:
-                    current_device_name = device_name
-                    st.markdown(f'<div class="device-type-header">📦 {device_name}</div>', unsafe_allow_html=True)
+                if device_name not in device_groups:
+                    device_groups[device_name] = []
+                device_groups[device_name].append((label, type_id))
+            
+            # 各機種グループを表示
+            for device_name, items in device_groups.items():
+                # 機種名の区切り線を表示
+                st.markdown(f"""
+                    <div style="display: flex; align-items: center; margin: 16px 0 8px 0; gap: 10px;">
+                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
+                        <span style="color: #555; font-size: 0.9em; font-weight: 600;">{device_name}</span>
+                        <div style="flex: 1; height: 1px; background: #ddd;"></div>
+                    </div>
+                """, unsafe_allow_html=True)
                 
-                # ロット番号のみを表示（機種名はヘッダーで表示済み）
-                if lot_sort_key != float('inf'):
-                    display_label = f"Lot: {label.split('Lot:')[1].rstrip(')')}" if 'Lot:' in label else label
-                else:
-                    display_label = f"ID: {type_id}" if 'ID:' in label else label
+                # この機種のラベルリスト
+                labels = [item[0] for item in items]
                 
-                # 選択状態を判定
-                is_selected = st.session_state.get(widget_key) == label
+                # ラジオボタンを表示
+                selected_in_group = st.radio(
+                    f"{device_name}のロット選択",
+                    options=labels,
+                    key=f"device_group_{device_name}",
+                    label_visibility="collapsed"
+                )
                 
-                if st.button(
-                    f"{'🔘' if is_selected else '⚪'} {display_label}",
-                    key=f"device_btn_{type_id}",
-                    use_container_width=True,
-                    type="primary" if is_selected else "secondary"
-                ):
-                    st.session_state[widget_key] = label
-                    st.session_state['master_selected_type_id'] = type_id
-                    st.rerun()
+                # 選択が変更されたらセッションに保存
+                if selected_in_group and selected_in_group in type_opts:
+                    if st.session_state.get(widget_key) != selected_in_group:
+                        st.session_state[widget_key] = selected_in_group
+                        st.session_state['master_selected_type_id'] = type_opts[selected_in_group]
             
             # 選択されたラベルを取得
             selected_type_key = st.session_state.get(widget_key, target_label)
