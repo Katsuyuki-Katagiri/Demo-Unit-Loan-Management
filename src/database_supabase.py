@@ -1516,9 +1516,10 @@ def get_related_records(loan_id: int = None, return_id: int = None):
 
 @retry_supabase_query()
 def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
-    """貸出履歴を取得"""
+    """貸出履歴を取得（返却情報を含む）"""
     client = get_client()
     
+    # まず貸出データを取得
     query = client.table("loans").select("*").eq("device_unit_id", device_unit_id)
     
     if not include_canceled:
@@ -1529,8 +1530,35 @@ def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, in
     if limit:
         query = query.limit(limit).offset(offset)
     
-    result = query.execute()
-    return result.data
+    loans_result = query.execute()
+    loans = loans_result.data
+    
+    if not loans:
+        return []
+    
+    # 貸出IDで返却データを取得
+    loan_ids = [loan["id"] for loan in loans]
+    returns_result = client.table("returns").select("loan_id, assetment_returned, confirmation_checked").in_("loan_id", loan_ids).eq("canceled", 0).execute()
+    
+    # 返却データをloan_idでマップ化
+    returns_map = {}
+    for ret in returns_result.data:
+        returns_map[ret["loan_id"]] = ret
+    
+    # 貸出データに返却情報をマージ
+    result = []
+    for loan in loans:
+        loan_data = dict(loan)
+        ret_info = returns_map.get(loan["id"])
+        if ret_info:
+            loan_data["assetment_returned"] = ret_info.get("assetment_returned", False)
+            loan_data["confirmation_checked"] = ret_info.get("confirmation_checked", False)
+        else:
+            loan_data["assetment_returned"] = False
+            loan_data["confirmation_checked"] = False
+        result.append(loan_data)
+    
+    return result
 
 @retry_supabase_query()
 def get_check_session_lines(check_session_id: int):
