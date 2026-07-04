@@ -529,9 +529,21 @@ def update_user_password(user_id: int, new_password: str) -> tuple:
         return False, f"パスワード更新エラー: {e}"
 
 def update_user_role(user_id: int, new_role: str) -> tuple:
-    """ユーザーの権限を更新"""
+    """ユーザーの権限を更新（最後の管理者を降格させることはできない）"""
     client = get_client()
     try:
+        # 対象ユーザーの現在の権限を確認
+        target = client.table("users").select("role").eq("id", user_id).execute()
+        if not target.data:
+            return False, "ユーザーが見つかりません。"
+
+        current_role = target.data[0]["role"]
+        # 管理者を他の権限に変更する場合、最後の1人でないことを確認
+        if current_role == "admin" and new_role != "admin":
+            admins = client.table("users").select("id").eq("role", "admin").execute()
+            if len(admins.data) <= 1:
+                return False, "最後の管理者の権限は変更できません。"
+
         client.table("users").update({"role": new_role}).eq("id", user_id).execute()
         return True, "権限を更新しました"
     except Exception as e:

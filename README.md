@@ -83,7 +83,7 @@
 
 ## ディレクトリ構成
 ```
-├── app.py                    # メインアプリケーション
+├── app.py                    # メインアプリケーション（起動時のDB接続エラーも安全に処理）
 ├── src/
 │   ├── views/                # 画面UIコンポーネント
 │   │   ├── home.py           # ホーム画面
@@ -96,21 +96,23 @@
 │   │   ├── login.py          # ログイン画面
 │   │   └── setup.py          # 初期セットアップ画面
 │   ├── database.py           # データベースディスパッチャー（SQLite/Supabase自動切替）
-│   ├── database_sqlite.py    # SQLiteデータベース操作
+│   ├── database_sqlite.py    # SQLiteデータベース操作（Supabase版と機能同等）
 │   ├── database_supabase.py  # Supabaseデータベース操作
 │   ├── logic.py              # ビジネスロジック・通知処理
 │   ├── auth.py               # 認証機能
 │   ├── storage.py            # ストレージ操作（ローカル/Supabase Storage）
 │   ├── styles.py             # グローバルCSS定義
 │   └── ui.py                 # 共通UIコンポーネント
-├── data/
-│   ├── app.db                # SQLiteデータベース（ローカルモード時）
-│   └── uploads/              # アップロード画像
 ├── docs/
 │   ├── DEPLOYMENT_MANUAL.md  # Streamlit Cloudデプロイ手順
 │   └── SUPABASE_SETUP.md     # Supabaseセットアップ手順
 ├── scripts/
-│   └── supabase_schema.sql   # Supabase用スキーマ
+│   ├── supabase_schema.sql   # Supabase用テーブル作成スクリプト
+│   └── supabase_storage.sql  # Supabase Storageバケット/ポリシー設定
+├── tools/                    # 開発・調査用スクリプト（Git管理外・実行任意）
+├── data/                     # 実行時生成データ（Git管理外）
+│   ├── app.db                # SQLiteデータベース（ローカルモード時）
+│   └── uploads/              # アップロード画像
 ├── .streamlit/
 │   ├── config.toml           # Streamlit設定
 │   └── secrets.toml          # Supabase接続情報（Git管理外）
@@ -118,6 +120,8 @@
 ├── install_deps.bat          # 依存関係インストール用
 └── requirements.txt          # Python依存関係
 ```
+
+> **補足**: `data/`（DB・アップロード写真）と `tools/`（デバッグ用スクリプト）、`.streamlit/secrets.toml` は `.gitignore` で除外され、リポジトリには含まれません。`data/` はアプリ起動時に自動生成されます。
 
 ## セットアップと実行
 
@@ -192,18 +196,22 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 | user | 貸出・返却操作、履歴閲覧 |
 | related | 関連業者向け（限定的なアクセス） |
 
+> **最後の管理者保護**: 管理者が1名のみの場合、その管理者の削除・権限変更（降格）はできません。全管理者を失ってシステムに入れなくなる事故を防ぎます。
+
 ## セキュリティ
 
 - **パスワード**: bcryptでハッシュ化して保存
 - **パスワード変更**: ユーザーがサイドバーから自分のパスワードを変更可能（現在のパスワード入力必須）
 - **パスワードリセット**: 管理者が「設定」→「ユーザー管理」から他ユーザーのパスワードをリセット可能
-- **APIキー**: `.streamlit/secrets.toml` に保存し、`.gitignore` で除外
+- **最後の管理者保護**: 最後の1名の管理者は削除・降格不可
+- **APIキー**: `.streamlit/secrets.toml` に保存し、`.gitignore` で除外（DBファイル `*.db` もリポジトリに含めない）
 - **セッション管理**: Streamlitのセッションステートを使用
 
 ## 更新履歴
 
 | 日付 | 内容 |
 |------|------|
+| 2026-07-04 | 全体精査対応: SQLiteモードの機能パリティ回復（Supabase版にしか無かった約30関数を移植）、最後の管理者の削除・降格を禁止する保護追加、起動時のDB接続失敗を安全に処理（生トレースバックで落とさず日本語案内＋再接続ボタン）、`scripts/supabase_schema.sql` の `device_types.description` 欠落修正、リポジトリ整理（DBファイル・生成物・デバッグスクリプトの追跡解除、`tools/` へ集約） |
 | 2026-01-27 | 機種一覧UIの視認性向上（機種名の区切り線スタイル改善、青アクセントカラー適用）、機種リストのソート機能追加（機種名順→ロット番号順） |
 | 2026-01-26 | パフォーマンス改善（N+1クエリ修正、リトライデコレータ追加）、機種選択UIの安定性向上、構成品検索のEnterキー対応改善 |
 | 2026-01-26 | 構成品一括登録機能追加、トグル式不足品管理機能追加、不足品の貸出・返却チェックリスト自動除外機能追加 |
@@ -223,10 +231,21 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 このプロジェクトは社内利用を目的としています。
 
-## サポート
+## トラブルシューティング
 
 問題が発生した場合は、以下を確認してください：
 1. `data/app.db` が存在するか（SQLiteモード時）
-2. `.streamlit/secrets.toml` にSupabase設定が正しいか（クラウドモード時）
+2. `.streamlit/secrets.toml` / Streamlit CloudのSecretsにSupabase設定が正しいか（クラウドモード時）
 3. Python依存関係がインストールされているか
 4. アプリを再起動してみる（`Ctrl+C` で停止後、再度 `Start_App.bat` を実行）
+
+### 「データベースに接続できませんでした」と表示される場合（Supabaseモード）
+
+`httpx.ConnectError` 等でDBに接続できないときは、多くの場合 **Supabaseプロジェクトが一時停止**しています（無料プランは無操作が続くと自動停止し、90日を超えるとダッシュボードからの再開ができなくなります）。
+
+- **停止直後の場合**: Supabaseダッシュボードでプロジェクトを再開（Restore/Resume）
+- **90日超で再開不可の場合**: バックアップをダウンロードして**新しいSupabaseプロジェクトへ復元**し、`SUPABASE_URL` / `SUPABASE_KEY` を新プロジェクトの値に差し替える
+  - テーブルは `scripts/supabase_schema.sql`、Storageバケット/ポリシーは `scripts/supabase_storage.sql` で再作成できます
+  - Storage上の写真（構成品写真・セッション写真）はDBバックアップには含まれないため、別途再アップロードが必要です
+
+> 定期的にアプリへアクセスするか、Supabaseの自動停止を回避する運用（有料プラン等）を検討すると、この停止を防げます。
