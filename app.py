@@ -20,25 +20,61 @@ st.set_page_config(
 from src.styles import apply_custom_css
 apply_custom_css()
 
+
+def _stop_with_db_connection_error(err: Exception):
+    """
+    DB（Supabase）への接続に失敗したとき、生のトレースバックで落とさず、
+    日本語の案内と再接続ボタンを表示してアプリを停止する。
+    """
+    st.error("🔌 データベースに接続できませんでした。")
+    st.markdown(
+        """
+        時間をおいて再度お試しください。数分待っても復旧しない場合は、以下をご確認ください。
+
+        - **Supabaseプロジェクトが一時停止していないか**（無料プランは無操作が続くと自動停止します）。
+          Supabaseのダッシュボードでプロジェクトを開き、停止中なら「Restore / Resume」で再開してください。
+        - **接続情報（SUPABASE_URL / SUPABASE_KEY）が正しいか**。
+        - Supabase側で一時的な障害が発生していないか。
+        """
+    )
+    if st.button("🔄 再接続を試す", type="primary"):
+        # キャッシュ済みのSupabaseクライアントを破棄してから再実行
+        try:
+            st.cache_resource.clear()
+        except Exception:
+            pass
+        st.session_state.pop('db_initialized', None)
+        st.rerun()
+
+    with st.expander("技術的な詳細"):
+        st.code(f"{type(err).__name__}: {err}")
+
+    st.stop()
+
+
 # Initialize DB on start
 if 'db_initialized' not in st.session_state:
-    init_db()
-    # Migration for new features - すべてのマイグレーションを起動時に実行
-    from src.database import (
-        migrate_category_visibility,
-        migrate_loans_assetment_check,
-        migrate_loans_notes,
-        migrate_returns_assetment_check,
-        migrate_returns_notes
-    )
-    migrate_category_visibility()
-    migrate_loans_assetment_check()
-    migrate_loans_notes()
-    migrate_returns_assetment_check()
-    migrate_returns_notes()
-    
-    seed_categories()
-    st.session_state['db_initialized'] = True
+    try:
+        init_db()
+        # Migration for new features - すべてのマイグレーションを起動時に実行
+        from src.database import (
+            migrate_category_visibility,
+            migrate_loans_assetment_check,
+            migrate_loans_notes,
+            migrate_returns_assetment_check,
+            migrate_returns_notes
+        )
+        migrate_category_visibility()
+        migrate_loans_assetment_check()
+        migrate_loans_notes()
+        migrate_returns_assetment_check()
+        migrate_returns_notes()
+
+        seed_categories()
+        st.session_state['db_initialized'] = True
+    except Exception as e:
+        # 起動時のDB接続失敗を握りつぶさず、ユーザーに分かる形で案内する
+        _stop_with_db_connection_error(e)
 
 def _render_password_change_dialog():
     """パスワード変更ダイアログを表示"""
@@ -87,7 +123,14 @@ def _render_password_change_dialog():
 
 def main():
     # 1. Check if Setup is needed
-    if not check_users_exist():
+    # 起動直後のDBアクセス。接続断が起きても生のトレースバックで落とさない。
+    try:
+        users_exist = check_users_exist()
+    except Exception as e:
+        _stop_with_db_connection_error(e)
+        return
+
+    if not users_exist:
         render_setup_view()
         return
 
