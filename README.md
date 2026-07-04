@@ -153,6 +153,21 @@ Start_App.bat
 streamlit run app.py
 ```
 
+### テスト（基幹フローの自動検証）
+
+貸出→返却→取消の基幹フロー、稼働率計算、管理者保護の回帰テストを `tests/` に用意しています。
+テストはSQLiteモードで一時DBを用いて実行され、本番Supabaseには一切触れません。
+
+```powershell
+# 開発用依存（pytest含む）をインストール
+uv pip install -r requirements-dev.txt   # または: pip install -r requirements-dev.txt
+
+# テスト実行
+pytest
+```
+
+修正を加えた後は `pytest` を実行し、基幹機能が壊れていないことを確認してください。
+
 ブラウザで `http://localhost:8501` にアクセスします。
 
 ## 初回起動

@@ -25,6 +25,9 @@ wheels/
 venv/
 ENV/
 
+# Test cache
+.pytest_cache/
+
 # Streamlit
 .streamlit/secrets.toml
 
