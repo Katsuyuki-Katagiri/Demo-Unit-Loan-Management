@@ -31,7 +31,8 @@ CREATE TABLE IF NOT EXISTS device_types (
     id SERIAL PRIMARY KEY,
     category_id INTEGER NOT NULL REFERENCES categories(id),
     name TEXT NOT NULL,
-    sort_order INTEGER DEFAULT 0
+    sort_order INTEGER DEFAULT 0,
+    description TEXT
 );
 
 -- 5. Items テーブル
