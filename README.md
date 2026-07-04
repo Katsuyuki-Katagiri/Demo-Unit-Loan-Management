@@ -106,6 +106,9 @@
 ├── docs/
 │   ├── DEPLOYMENT_MANUAL.md  # Streamlit Cloudデプロイ手順
 │   └── SUPABASE_SETUP.md     # Supabaseセットアップ手順
+├── tests/                    # 自動テスト（pytest）
+│   ├── conftest.py           # テスト共通基盤（SQLite強制・一時DB・マスタ投入）
+│   └── test_core_flow.py     # 基幹フロー/稼働率/管理者保護の回帰テスト
 ├── scripts/
 │   ├── supabase_schema.sql   # Supabase用テーブル作成スクリプト
 │   └── supabase_storage.sql  # Supabase Storageバケット/ポリシー設定
@@ -118,7 +121,9 @@
 │   └── secrets.toml          # Supabase接続情報（Git管理外）
 ├── Start_App.bat             # アプリ起動用バッチファイル
 ├── install_deps.bat          # 依存関係インストール用
-└── requirements.txt          # Python依存関係
+├── requirements.txt          # Python依存関係
+├── requirements-dev.txt      # 開発・テスト用依存（pytest等）
+└── pytest.ini                # pytest設定
 ```
 
 > **補足**: `data/`（DB・アップロード写真）と `tools/`（デバッグ用スクリプト）、`.streamlit/secrets.toml` は `.gitignore` で除外され、リポジトリには含まれません。`data/` はアプリ起動時に自動生成されます。
@@ -127,17 +132,25 @@
 
 ### 必要要件
 - Python 3.10以上
+- （任意）[uv](https://docs.astral.sh/uv/) … 仮想環境・依存管理を高速に行えるツール
 
 ### 初期設定 (初回のみ)
 
-1. **依存関係のインストール**:
-   ```powershell
-   install_deps.bat
-   ```
-   または
-   ```powershell
-   pip install -r requirements.txt
-   ```
+`Start_App.bat` は `.venv` 内のPythonを使用します。仮想環境を作成して依存をインストールしてください。
+
+- **uv を使う場合（推奨）**:
+  ```powershell
+  uv venv
+  uv pip install -r requirements.txt
+  ```
+- **従来の pip を使う場合**:
+  ```powershell
+  install_deps.bat
+  ```
+  または
+  ```powershell
+  pip install -r requirements.txt
+  ```
 
 ### アプリケーションの起動
 
@@ -153,6 +166,8 @@ Start_App.bat
 streamlit run app.py
 ```
 
+ブラウザで `http://localhost:8501` にアクセスします。
+
 ### テスト（基幹フローの自動検証）
 
 貸出→返却→取消の基幹フロー、稼働率計算、管理者保護の回帰テストを `tests/` に用意しています。
@@ -166,9 +181,7 @@ uv pip install -r requirements-dev.txt   # または: pip install -r requirement
 pytest
 ```
 
-修正を加えた後は `pytest` を実行し、基幹機能が壊れていないことを確認してください。
-
-ブラウザで `http://localhost:8501` にアクセスします。
+11ケース（正常/NG貸出・正常/NG返却・在庫なし/貸出なしの拒否・取消カスケード・稼働率・管理者保護）を約20秒で検証します。修正を加えた後は `pytest` を実行し、基幹機能が壊れていないことを確認してください。
 
 ## 初回起動
 
@@ -226,6 +239,8 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 
 | 日付 | 内容 |
 |------|------|
+| 2026-07-04 | 基幹フロー（貸出/返却/取消）・稼働率・管理者保護の自動テスト（pytest 11ケース）を追加。`tests/`・`requirements-dev.txt`・`pytest.ini` 新設 |
+| 2026-07-04 | Supabaseプロジェクトの一時停止（90日超）に伴い、新プロジェクトへデータ移行・接続先切替・構成品写真の再登録を実施 |
 | 2026-07-04 | 全体精査対応: SQLiteモードの機能パリティ回復（Supabase版にしか無かった約30関数を移植）、最後の管理者の削除・降格を禁止する保護追加、起動時のDB接続失敗を安全に処理（生トレースバックで落とさず日本語案内＋再接続ボタン）、`scripts/supabase_schema.sql` の `device_types.description` 欠落修正、リポジトリ整理（DBファイル・生成物・デバッグスクリプトの追跡解除、`tools/` へ集約） |
 | 2026-01-27 | 機種一覧UIの視認性向上（機種名の区切り線スタイル改善、青アクセントカラー適用）、機種リストのソート機能追加（機種名順→ロット番号順） |
 | 2026-01-26 | パフォーマンス改善（N+1クエリ修正、リトライデコレータ追加）、機種選択UIの安定性向上、構成品検索のEnterキー対応改善 |
