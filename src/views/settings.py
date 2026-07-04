@@ -37,19 +37,34 @@ def render_settings_view():
             except:
                 pass
 
+        # 既存パスワードが登録済みかどうか（値そのものは画面に出さない）
+        has_saved_password = bool(default_config.get('password'))
+
         with st.form("smtp_form"):
             enabled = st.checkbox("メール通知を有効にする", value=default_config['enabled'])
             c1, c2 = st.columns(2)
             host = c1.text_input("SMTPホスト", value=default_config['host'], help="例: smtp.gmail.com")
             port = c2.number_input("SMTPポート", value=int(default_config['port']), help="例: 587")
             user = c1.text_input("SMTPユーザー名", value=default_config['user'])
-            password = c2.text_input("SMTPパスワード", value=default_config['password'], type="password")
+            # セキュリティ上、保存済みパスワードはフォームに再表示しない。
+            # 空欄のまま保存すれば既存パスワードを維持する。
+            password_help = "登録済み。変更する場合のみ入力してください（空欄で現在の値を維持）" if has_saved_password else None
+            password_placeholder = "●●●●●●（登録済み）" if has_saved_password else ""
+            password = c2.text_input(
+                "SMTPパスワード",
+                value="",
+                type="password",
+                help=password_help,
+                placeholder=password_placeholder,
+            )
             from_addr = st.text_input("送信元メールアドレス (From)", value=default_config['from_addr'])
-            
+
             if st.form_submit_button("保存"):
+                # パスワード欄が空欄なら既存の値を維持、入力があればそれを採用
+                effective_password = password if password else default_config.get('password', '')
                 new_config = {
                     "enabled": enabled, "host": host, "port": port,
-                    "user": user, "password": password, "from_addr": from_addr
+                    "user": user, "password": effective_password, "from_addr": from_addr
                 }
                 save_system_setting('smtp_config', json.dumps(new_config))
                 st.success("SMTP設定を保存しました。")

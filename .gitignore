@@ -28,8 +28,15 @@ ENV/
 # Streamlit
 .streamlit/secrets.toml
 
-# Database (local only - will be reset on cloud)
-# demo_loan.db
+# Database (local only - 実データ・パスワードハッシュを含むためコミットしない)
+*.db
+*.sqlite
+*.sqlite3
+data/uploads/
+
+# Claude worktrees / 作業用複製
+.claude/worktrees/
+_sharepoint_copy/
 
 # IDE
 .idea/
