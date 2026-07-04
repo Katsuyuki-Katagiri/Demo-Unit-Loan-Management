@@ -1,27 +1,15 @@
 import os
+import sqlite3
+from typing import Optional, List, Tuple, Dict, Any
+
+import bcrypt
 import streamlit as st
 
-# Supabaseが設定されている場合はSupabase版を使用
-_use_supabase = False
-try:
-    supabase_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-    supabase_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
-    if supabase_url and supabase_key:
-        _use_supabase = True
-except Exception:
-    pass
+# SQLite版データベースレイヤー
+# Supabase/SQLiteの振り分けは src/database.py が行うため、ここでは常にSQLite実装を提供する
 
-if _use_supabase:
-    # Supabase版の全関数をインポート
-    from src.database_supabase import *
-else:
-    # SQLite版を使用
-    import sqlite3
-    from typing import Optional, List, Tuple, Dict, Any
-    import bcrypt
-
-    DB_PATH = os.path.join("data", "app.db")
-    UPLOAD_DIR = os.path.join("data", "uploads")
+DB_PATH = os.path.join("data", "app.db")
+UPLOAD_DIR = os.path.join("data", "uploads")
 
 
 def init_db():
@@ -274,7 +262,9 @@ def init_db():
     migrate_category_managing_department()
     migrate_category_description()
     migrate_category_sort_order()
-    
+    migrate_device_unit_missing_items()
+    migrate_device_type_description()
+
     migrate_dates()
 
 # --- Login History ---
@@ -433,6 +423,31 @@ def update_user_password(user_id: int, new_password: str) -> tuple:
     finally:
         conn.close()
 
+def update_user_role(user_id: int, new_role: str) -> tuple:
+    """ユーザーの権限を更新（最後の管理者を降格させることはできない）"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("SELECT role FROM users WHERE id = ?", (user_id,))
+        row = c.fetchone()
+        if not row:
+            return False, "ユーザーが見つかりません。"
+
+        current_role = row[0]
+        # 管理者を他の権限に変更する場合、最後の1人でないことを確認
+        if current_role == 'admin' and new_role != 'admin':
+            c.execute("SELECT count(*) FROM users WHERE role = 'admin'")
+            if c.fetchone()[0] <= 1:
+                return False, "最後の管理者の権限は変更できません。"
+
+        c.execute("UPDATE users SET role = ? WHERE id = ?", (new_role, user_id))
+        conn.commit()
+        return True, "権限を更新しました"
+    except Exception as e:
+        return False, f"権限更新エラー: {e}"
+    finally:
+        conn.close()
+
 
 # --- Master Helper Functions ---
 
@@ -527,6 +542,38 @@ def migrate_category_description():
         if 'description' not in columns:
             print("Migrating categories: adding description column...")
             c.execute("ALTER TABLE categories ADD COLUMN description TEXT")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
+def migrate_device_unit_missing_items():
+    """device_unitsテーブルに不足品リスト(missing_items)カラムを追加する。"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(device_units)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'missing_items' not in columns:
+            print("Migrating device_units: adding missing_items column...")
+            c.execute("ALTER TABLE device_units ADD COLUMN missing_items TEXT")
+            conn.commit()
+    except Exception as e:
+        print(f"Migration error: {e}")
+    finally:
+        conn.close()
+
+def migrate_device_type_description():
+    """device_typesテーブルに補足説明(description)カラムを追加する。"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("PRAGMA table_info(device_types)")
+        columns = [r[1] for r in c.fetchall()]
+        if 'description' not in columns:
+            print("Migrating device_types: adding description column...")
+            c.execute("ALTER TABLE device_types ADD COLUMN description TEXT")
             conn.commit()
     except Exception as e:
         print(f"Migration error: {e}")
@@ -837,7 +884,8 @@ def get_device_units(device_type_id: int):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("SELECT * FROM device_units WHERE device_type_id = ?", (device_type_id,))
-    res = c.fetchall()
+    # ビュー側が .get() を使うため dict で返す（Supabase版と同じ形）
+    res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
 
@@ -848,7 +896,8 @@ def get_device_unit_by_id(unit_id: int):
     c.execute("SELECT * FROM device_units WHERE id = ?", (unit_id,))
     res = c.fetchone()
     conn.close()
-    return res
+    # logic.py等が .get() を使うため dict で返す（Supabase版と同じ形）
+    return dict(res) if res else None
 
 def update_device_unit(unit_id: int, lot_number: str, mfg_date: str, location: str, last_check_date: str, next_check_date: str):
     conn = sqlite3.connect(DB_PATH)
@@ -1191,24 +1240,13 @@ def get_all_check_sessions_for_loan(loan_id: int):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""
-        SELECT * FROM check_sessions 
-        WHERE loan_id = ? 
+        SELECT * FROM check_sessions
+        WHERE loan_id = ?
         ORDER BY id ASC
     """, (loan_id,))
     res = c.fetchall()
     conn.close()
     return res
-
-def create_check_line(check_session_id: int, item_id: int, required_qty: int, result: str, ng_reason: str = None, found_qty: int = None, comment: str = None):
-    """チェック明細を作成"""
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("""
-        INSERT INTO check_lines (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (check_session_id, item_id, required_qty, result, ng_reason, found_qty, comment))
-    conn.commit()
-    conn.close()
 
 def get_check_session_by_loan_id(loan_id: int, session_type: str = 'checkout'):
     conn = sqlite3.connect(DB_PATH)
@@ -1337,26 +1375,176 @@ def migrate_phase4():
     conn.commit()
     conn.close()
 
-# --- Supabase Storage Dummies ---
+# --- ローカル写真ストレージ（Supabase Storage相当のSQLiteモード実装） ---
+# 写真は data/uploads 配下に保存し、ビュー側は UPLOAD_DIR からの相対パスで参照する
+
+# セッション写真の保存上限（Supabase版と同じ値）
+SESSION_PHOTOS_LIMIT = 2000
 
 def upload_photo_to_storage(file_bytes: bytes, filename: str) -> str:
-    # SQLite版ではローカル保存されるため、この関数は使用されないか、
-    # 必要ならローカル保存ロジックを入れるべきだが、
-    # 現状の実装ロジックでは呼び出し側で分岐等している前提とするか、
-    # ここでは空を返す
-    return ""
+    """構成品写真等をローカル(data/uploads)に保存し、相対ファイル名を返す。失敗時は空文字。"""
+    try:
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+        path = os.path.join(UPLOAD_DIR, filename)
+        with open(path, "wb") as f:
+            f.write(file_bytes)
+        # ビュー側は http で始まらないパスを UPLOAD_DIR 相対として扱うため、ファイル名を返す
+        return filename
+    except Exception as e:
+        print(f"Local photo save error: {e}")
+        return ""
 
 def delete_photo_from_storage(filename: str) -> bool:
-    return False
+    """ローカル保存された写真を削除"""
+    try:
+        path = os.path.join(UPLOAD_DIR, filename)
+        if os.path.isfile(path):
+            os.remove(path)
+            return True
+        return False
+    except Exception as e:
+        print(f"Local photo delete error: {e}")
+        return False
 
 def get_photo_public_url(filename: str) -> str:
-    return ""
+    """ローカルモードでは絶対URLは無いため、存在すればローカルパスを返す"""
+    if not filename:
+        return ""
+    if filename.startswith("http"):
+        return filename
+    path = os.path.join(UPLOAD_DIR, filename)
+    return path if os.path.exists(path) else ""
 
 def upload_session_photo(session_id: str, file_bytes: bytes, index: int = 0) -> str:
-    return ""
+    """貸出・返却セッション写真をローカル(data/uploads/{session_id}/)に保存する。"""
+    try:
+        session_dir = os.path.join(UPLOAD_DIR, str(session_id))
+        os.makedirs(session_dir, exist_ok=True)
+        path = os.path.join(session_dir, f"photo_{index}.webp")
+        with open(path, "wb") as f:
+            f.write(file_bytes)
+
+        # 最初の1枚のときのみ古いセッション写真をクリーンアップ（Supabase版と同じ挙動）
+        if index == 0:
+            try:
+                cleanup_old_session_photos()
+            except Exception as cleanup_error:
+                print(f"Cleanup error (non-critical): {cleanup_error}")
+
+        return path
+    except Exception as e:
+        print(f"Session photo save error: {e}")
+        return ""
 
 def get_session_photos(session_id: str) -> list:
-    return []
+    """セッションの写真ファイルパス一覧を取得（st.imageでそのまま表示可能）"""
+    try:
+        session_dir = os.path.join(UPLOAD_DIR, str(session_id))
+        if not os.path.isdir(session_dir):
+            return []
+        photos = sorted(
+            f for f in os.listdir(session_dir)
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
+        )
+        return [os.path.join(session_dir, f) for f in photos]
+    except Exception as e:
+        print(f"Get session photos error: {e}")
+        return []
+
+def count_all_session_photos() -> int:
+    """セッション写真の総数をカウント（UPLOAD_DIR直下のセッションフォルダを走査）"""
+    total = 0
+    try:
+        if not os.path.isdir(UPLOAD_DIR):
+            return 0
+        for name in os.listdir(UPLOAD_DIR):
+            folder = os.path.join(UPLOAD_DIR, name)
+            if os.path.isdir(folder):
+                total += sum(
+                    1 for f in os.listdir(folder)
+                    if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
+                )
+    except Exception as e:
+        print(f"Count session photos error: {e}")
+    return total
+
+def get_protected_session_folders() -> set:
+    """削除対象から除外すべきセッションフォルダ（未返却の貸出に紐づくもの）を取得"""
+    protected = set()
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("""
+            SELECT cs.device_photo_dir
+            FROM check_sessions cs
+            JOIN loans l ON cs.loan_id = l.id
+            WHERE l.status = 'open' AND (l.canceled = 0 OR l.canceled IS NULL)
+              AND cs.device_photo_dir IS NOT NULL AND cs.device_photo_dir != ''
+        """)
+        protected = {r[0] for r in c.fetchall()}
+    except Exception as e:
+        print(f"Get protected folders error: {e}")
+    finally:
+        conn.close()
+    return protected
+
+def get_oldest_session_folders(limit: int = 10) -> list:
+    """最も古いセッションフォルダ名を取得（未返却貸出のフォルダは除外）"""
+    try:
+        if not os.path.isdir(UPLOAD_DIR):
+            return []
+        protected = get_protected_session_folders()
+        folders = []
+        for name in os.listdir(UPLOAD_DIR):
+            folder = os.path.join(UPLOAD_DIR, name)
+            if os.path.isdir(folder) and name not in protected:
+                folders.append((os.path.getmtime(folder), name))
+        folders.sort()
+        return [name for _, name in folders[:limit]]
+    except Exception as e:
+        print(f"Get oldest folders error: {e}")
+        return []
+
+def delete_session_folder(folder_name: str) -> tuple:
+    """セッションフォルダを削除し、(成功可否, 削除ファイル数) を返す"""
+    try:
+        folder = os.path.join(UPLOAD_DIR, folder_name)
+        if not os.path.isdir(folder):
+            return True, 0
+        count = len(os.listdir(folder))
+        import shutil
+        shutil.rmtree(folder)
+        return True, count
+    except Exception as e:
+        print(f"Delete session folder error: {e}")
+        return False, 0
+
+def cleanup_old_session_photos() -> tuple:
+    """写真総数が上限を超えている場合、古いセッションフォルダから削除する"""
+    try:
+        total_photos = count_all_session_photos()
+        if total_photos <= SESSION_PHOTOS_LIMIT:
+            return 0, 0
+
+        photos_to_delete = total_photos - SESSION_PHOTOS_LIMIT
+        deleted_folders = 0
+        deleted_photos = 0
+
+        while deleted_photos < photos_to_delete:
+            oldest = get_oldest_session_folders(5)
+            if not oldest:
+                break
+            for folder_name in oldest:
+                success, count = delete_session_folder(folder_name)
+                if success:
+                    deleted_folders += 1
+                    deleted_photos += count
+                if deleted_photos >= photos_to_delete:
+                    break
+        return deleted_folders, deleted_photos
+    except Exception as e:
+        print(f"Cleanup old session photos error: {e}")
+        return 0, 0
 
 def get_loan_history(device_unit_id: int, limit: int = None, offset: int = 0, include_canceled: bool = True):
     # Ensure schema is up to date (needed for new Assetment columns if not yet run)
@@ -1805,7 +1993,7 @@ def get_loan_periods_for_unit(device_unit_id: int):
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     c.execute("""
-        SELECT l.checkout_date, r.return_date, l.status, l.canceled 
+        SELECT l.checkout_date, r.return_date, l.status, l.canceled
         FROM loans l
         LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
         WHERE l.device_unit_id = ? AND (l.canceled = 0 OR l.canceled IS NULL)
@@ -1813,4 +2001,243 @@ def get_loan_periods_for_unit(device_unit_id: int):
     res = [dict(row) for row in c.fetchall()]
     conn.close()
     return res
+
+
+# =========================================================
+# Supabase版とのパリティ関数
+# ビュー層・logic層は src.database 経由で以下を呼び出すため、
+# SQLiteモードでも同名・同シグネチャの関数を提供する
+# =========================================================
+
+# --- バッチクエリ関数（パフォーマンス最適化用） ---
+
+def get_all_device_units():
+    """全個体を一括取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM device_units")
+    res = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return res
+
+def get_device_units_for_types(type_ids: list):
+    """複数機種の個体を一括取得 {type_id: [unit, ...], ...}"""
+    if not type_ids:
+        return {}
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    placeholders = ','.join(['?'] * len(type_ids))
+    c.execute(f"SELECT * FROM device_units WHERE device_type_id IN ({placeholders})", tuple(type_ids))
+    units_by_type = {}
+    for row in c.fetchall():
+        unit = dict(row)
+        units_by_type.setdefault(unit['device_type_id'], []).append(unit)
+    conn.close()
+    return units_by_type
+
+def get_users_batch(user_ids: list):
+    """複数ユーザーを一括取得 {user_id: user_dict, ...}"""
+    if not user_ids:
+        return {}
+    unique_ids = list(set(user_ids))
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    placeholders = ','.join(['?'] * len(unique_ids))
+    c.execute(f"SELECT * FROM users WHERE id IN ({placeholders})", tuple(unique_ids))
+    res = {row['id']: dict(row) for row in c.fetchall()}
+    conn.close()
+    return res
+
+def get_active_loans_batch(unit_ids: list):
+    """複数個体のアクティブな貸出を一括取得 {unit_id: loan_dict, ...}"""
+    if not unit_ids:
+        return {}
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    placeholders = ','.join(['?'] * len(unit_ids))
+    c.execute(f"""
+        SELECT * FROM loans
+        WHERE device_unit_id IN ({placeholders})
+          AND status = 'open' AND (canceled = 0 OR canceled IS NULL)
+    """, tuple(unit_ids))
+    res = {row['device_unit_id']: dict(row) for row in c.fetchall()}
+    conn.close()
+    return res
+
+def get_all_loan_periods(unit_ids: list, start_date: str, end_date: str):
+    """複数個体の貸出期間を一括取得（稼働率計算用） {unit_id: [{checkout_date, return_date}, ...], ...}"""
+    if not unit_ids:
+        return {}
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    placeholders = ','.join(['?'] * len(unit_ids))
+    c.execute(f"""
+        SELECT l.device_unit_id, l.checkout_date, r.return_date
+        FROM loans l
+        LEFT JOIN returns r ON l.id = r.loan_id AND (r.canceled = 0 OR r.canceled IS NULL)
+        WHERE l.device_unit_id IN ({placeholders})
+          AND (l.canceled = 0 OR l.canceled IS NULL)
+          AND l.checkout_date <= ?
+    """, tuple(unit_ids) + (end_date,))
+    periods_by_unit = {}
+    for row in c.fetchall():
+        periods_by_unit.setdefault(row['device_unit_id'], []).append({
+            'checkout_date': row['checkout_date'],
+            'return_date': row['return_date']
+        })
+    conn.close()
+    return periods_by_unit
+
+def get_check_sessions_batch(loan_ids: list):
+    """複数貸出のチェックセッションを一括取得 {loan_id: [session, ...], ...}"""
+    if not loan_ids:
+        return {}
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    placeholders = ','.join(['?'] * len(loan_ids))
+    c.execute(f"""
+        SELECT * FROM check_sessions
+        WHERE loan_id IN ({placeholders}) AND (canceled = 0 OR canceled IS NULL)
+        ORDER BY id
+    """, tuple(loan_ids))
+    sessions_by_loan = {}
+    for row in c.fetchall():
+        sess = dict(row)
+        sessions_by_loan.setdefault(sess['loan_id'], []).append(sess)
+    conn.close()
+    return sessions_by_loan
+
+def get_check_lines_batch(session_ids: list):
+    """複数セッションのチェック明細を一括取得 {session_id: [line, ...], ...}"""
+    if not session_ids:
+        return {}
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    placeholders = ','.join(['?'] * len(session_ids))
+    c.execute(f"""
+        SELECT cl.*, i.name as item_name, i.photo_path
+        FROM check_lines cl
+        JOIN items i ON cl.item_id = i.id
+        WHERE cl.check_session_id IN ({placeholders})
+    """, tuple(session_ids))
+    lines_by_session = {}
+    for row in c.fetchall():
+        line = dict(row)
+        lines_by_session.setdefault(line['check_session_id'], []).append(line)
+    conn.close()
+    return lines_by_session
+
+def get_check_sessions_for_unit(device_unit_id: int, limit: int = 10):
+    """個体のチェックセッション履歴を取得"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("""
+        SELECT * FROM check_sessions
+        WHERE device_unit_id = ? AND (canceled = 0 OR canceled IS NULL)
+        ORDER BY performed_at DESC LIMIT ?
+    """, (device_unit_id, limit))
+    res = [dict(row) for row in c.fetchall()]
+    conn.close()
+    return res
+
+def get_check_lines_for_session(session_id: int):
+    """セッションのチェック行を取得（item_name付き）"""
+    return [dict(row) for row in get_check_session_lines(session_id)]
+
+# --- Supabase版との互換エイリアス ---
+
+def get_open_issues_for_unit(device_unit_id: int):
+    """個体のオープンな問題を取得（Supabase互換エイリアス）"""
+    return [dict(row) for row in get_open_issues(device_unit_id)]
+
+def get_status_counts_for_category(category_id: int):
+    """カテゴリのステータス別個体数を取得（in_stock/loaned/needs_attentionのキーを保証）"""
+    counts = {"in_stock": 0, "loaned": 0, "needs_attention": 0}
+    raw = get_unit_status_counts(category_id)
+    for k, v in raw.items():
+        if k in counts:
+            counts[k] = v
+    return counts
+
+def update_device_unit_status(unit_id: int, status: str) -> bool:
+    """個体のステータスを更新（Supabase互換エイリアス）"""
+    try:
+        update_unit_status(unit_id, status)
+        return True
+    except Exception as e:
+        print(f"Error updating unit status: {e}")
+        return False
+
+def update_device_type_basic_info(type_id: int, new_name: str, description: str = "") -> bool:
+    """機種名と補足説明を更新"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("UPDATE device_types SET name = ?, description = ? WHERE id = ?", (new_name, description, type_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating device type: {e}")
+        return False
+    finally:
+        conn.close()
+
+def update_device_unit_missing_items(unit_id: int, missing_items_ids: list) -> bool:
+    """個体の不足品リストを更新（カンマ区切りのID文字列として保存）"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        csv_str = ",".join(map(str, missing_items_ids))
+        c.execute("UPDATE device_units SET missing_items = ? WHERE id = ?", (csv_str, unit_id))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating missing items: {e}")
+        return False
+    finally:
+        conn.close()
+
+def close_loan(loan_id: int):
+    """貸出をクローズ"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("UPDATE loans SET status = 'closed' WHERE id = ?", (loan_id,))
+    conn.commit()
+    conn.close()
+
+def delete_unit_override(override_id: int):
+    """個体差分を削除"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM unit_overrides WHERE id = ?", (override_id,))
+    conn.commit()
+    conn.close()
+
+def set_system_setting(key: str, value: str):
+    """システム設定を保存（Supabase互換エイリアス）"""
+    return save_system_setting(key, value)
+
+def get_notification_group_users(category_id: int):
+    """カテゴリの通知グループユーザーを取得（Supabase互換エイリアス）"""
+    return [dict(row) for row in get_notification_members(category_id)]
+
+def add_user_to_notification_group(category_id: int, user_id: int):
+    """ユーザーを通知グループに追加（Supabase互換エイリアス）"""
+    try:
+        add_notification_member(category_id, user_id)
+        return True
+    except Exception:
+        return False
+
+def remove_user_from_notification_group(category_id: int, user_id: int):
+    """ユーザーを通知グループから削除（Supabase互換エイリアス）"""
+    remove_notification_member(category_id, user_id)
 
